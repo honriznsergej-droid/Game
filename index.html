@@ -120,6 +120,9 @@
         </span>
     </div>
 
+    <!-- Скрытый общий input для выбора пользовательского спрайта -->
+    <input type="file" id="spriteInput" accept="image/png,image/webp,image/gif,image/jpeg" class="hidden">
+
     <!-- Стартовый экран -->
     <div id="startScreen" class="absolute inset-0 bg-slate-900/55 backdrop-blur-sm flex items-center justify-center p-4 z-20">
         <div class="bg-white/95 dark:bg-slate-900/95 border-2 border-amber-400/50 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl">
@@ -157,12 +160,16 @@
                 ПОЛЕТЕЛИ! 🚀
             </button>
 
-            <!-- Кнопка для тестирования своего PNG-спрайта -->
-            <label class="inline-flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer transition">
-                <span>🖼️</span>
-                <span id="spriteUploadLabel">Загрузить свой PNG-спрайт героя</span>
-                <input type="file" id="spriteInput" accept="image/png,image/webp,image/gif" class="hidden">
-            </label>
+            <!-- Кнопка для загрузки или смены своего PNG-спрайта -->
+            <div class="flex gap-2">
+                <button type="button" class="sprite-upload-trigger flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer transition">
+                    <span>🖼️</span>
+                    <span class="sprite-upload-label">Загрузить свой спрайт (PNG)</span>
+                </button>
+                <button type="button" id="resetSpriteBtnStart" class="hidden py-2.5 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-500 text-xs font-bold cursor-pointer transition" title="Сбросить спрайт">
+                    ✕
+                </button>
+            </div>
         </div>
     </div>
 
@@ -194,9 +201,20 @@
                 🎉 НОВЫЙ ЛИЧНЫЙ РЕКОРД!
             </div>
 
-            <button id="restartBtn" class="btn-arcade w-full bg-gradient-to-b from-emerald-400 to-green-600 text-white font-black text-lg py-4 rounded-2xl shadow-[0_6px_0_#15803d] cursor-pointer">
+            <button id="restartBtn" class="btn-arcade w-full bg-gradient-to-b from-emerald-400 to-green-600 text-white font-black text-lg py-4 rounded-2xl shadow-[0_6px_0_#15803d] mb-3 cursor-pointer">
                 ИГРАТЬ СНОВА 🔄
             </button>
+
+            <!-- Кнопка для загрузки/смены PNG-спрайта и на экране окончания игры -->
+            <div class="flex gap-2">
+                <button type="button" class="sprite-upload-trigger flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer transition">
+                    <span>🖼️</span>
+                    <span class="sprite-upload-label">Загрузить свой спрайт (PNG)</span>
+                </button>
+                <button type="button" id="resetSpriteBtnOver" class="hidden py-2.5 px-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-500 text-xs font-bold cursor-pointer transition" title="Сбросить спрайт">
+                    ✕
+                </button>
+            </div>
         </div>
     </div>
 
@@ -209,18 +227,17 @@
         const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
 
         if (tg) {
-            tg.ready();
-            tg.expand(); // Разворачиваем Mini App на максимальную высоту экрана
-            // Настраиваем цвет шапки Telegram под небо игры
-            if (tg.setHeaderColor) tg.setHeaderColor('#6ea3d0');
-            if (tg.setBackgroundColor) tg.setBackgroundColor('#1e293b');
+            try {
+                tg.ready();
+                tg.expand();
+                if (tg.setHeaderColor) tg.setHeaderColor('#6ea3d0');
+                if (tg.setBackgroundColor) tg.setBackgroundColor('#1e293b');
+            } catch (e) {}
         }
 
-        // Получаем имя пользователя из Telegram, если игра открыта внутри бота
         const userFirstName = tg?.initDataUnsafe?.user?.first_name || 'Пилот';
         document.getElementById('playerName').textContent = userFirstName;
 
-        // Вспомогательная функция тактильной отдачи (вибрации) в Telegram
         function triggerHaptic(type = 'light') {
             try {
                 if (tg && tg.HapticFeedback) {
@@ -229,9 +246,7 @@
                     else if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
                     else if (type === 'error') tg.HapticFeedback.notificationOccurred('error');
                 }
-            } catch (e) {
-                // Игнорируем в браузере вне Telegram
-            }
+            } catch (e) {}
         }
 
         /**
@@ -262,7 +277,6 @@
                 if (!this.ctx) return;
 
                 const now = this.ctx.currentTime;
-                // Мелодичный перезвон
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.type = 'triangle';
@@ -277,7 +291,7 @@
                 osc.start(now);
                 osc.stop(now + 0.18);
 
-                // Металлический звон тарелок (высокочастотный обертон)
+                // Металлический звон тарелок
                 const cymbalOsc = this.ctx.createOscillator();
                 const cymbalGain = this.ctx.createGain();
                 cymbalOsc.type = 'square';
@@ -342,13 +356,15 @@
 
         /**
          * ============================================================================
-         * 3. НАСТРОЙКА CANVAS И ПАРАМЕТРОВ ИГРЫ
+         * 3. НАСТРОЙКА CANVAS, СПРАЙТА И ПАРАМЕТРОВ ИГРЫ
          * ============================================================================
          */
+        const DEFAULT_SPRITE_FILE = 'monkey.png';
+        const SPRITE_STORAGE_KEY = 'cymbal_copter_custom_sprite';
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Элементы интерфейса
         const scoreDisplay = document.getElementById('scoreDisplay');
         const bestScoreDisplay = document.getElementById('bestScoreDisplay');
         const energyBar = document.getElementById('energyBar');
@@ -357,29 +373,89 @@
         const startScreen = document.getElementById('startScreen');
         const gameOverScreen = document.getElementById('gameOverScreen');
         const controlHint = document.getElementById('controlHint');
+        const spriteInput = document.getElementById('spriteInput');
+        const spriteUploadLabels = document.querySelectorAll('.sprite-upload-label');
+        const resetSpriteBtnStart = document.getElementById('resetSpriteBtnStart');
+        const resetSpriteBtnOver = document.getElementById('resetSpriteBtnOver');
 
-        // Загрузка рекорда из localStorage
-        let bestScore = parseInt(localStorage.getItem('cymbal_copter_best') || '0', 10);
+        let bestScore = 0;
+        try {
+            bestScore = parseInt(localStorage.getItem('cymbal_copter_best') || '0', 10);
+        } catch (e) {}
         bestScoreDisplay.textContent = bestScore;
 
-        // Пользовательский PNG-спрайт (если игрок загрузит свою картинку)
+        // Управление пользовательским спрайтом (автозагрузка monkey.png + ручной выбор + кэш)
         let customSpriteImg = null;
 
-        document.getElementById('spriteInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
+        function updateSpriteButtonsUI(labelText, showReset) {
+            spriteUploadLabels.forEach(el => {
+                el.textContent = labelText;
+            });
+            resetSpriteBtnStart.classList.toggle('hidden', !showReset);
+            resetSpriteBtnOver.classList.toggle('hidden', !showReset);
+        }
+
+        function applySpriteSource(src, labelText, saveToStorage = false) {
+            const img = new Image();
+            img.onload = () => {
+                if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                    customSpriteImg = img;
+                    updateSpriteButtonsUI(labelText, true);
+                    if (saveToStorage) {
+                        try {
+                            localStorage.setItem(SPRITE_STORAGE_KEY, src);
+                        } catch (e) {
+                            // Игнорируем переполнение localStorage для очень тяжёлых PNG
+                        }
+                    }
+                }
+            };
+            img.onerror = () => {
+                // Если monkey.png отсутствует, остаёмся на встроенной векторной иллюстрации
+            };
+            img.src = src;
+        }
+
+        // Проверяем сохранённый в браузере спрайт или файл monkey.png рядом с index.html
+        let savedSpriteData = null;
+        try {
+            savedSpriteData = localStorage.getItem(SPRITE_STORAGE_KEY);
+        } catch (e) {}
+
+        if (savedSpriteData) {
+            applySpriteSource(savedSpriteData, '✅ Спрайт загружен (сменить)', false);
+        } else {
+            applySpriteSource(DEFAULT_SPRITE_FILE, '✅ Подключён monkey.png (сменить)', false);
+        }
+
+        // Открытие диалога выбора картинки по клику на любую из кнопок (старт / рестарт)
+        document.querySelectorAll('.sprite-upload-trigger').forEach(btn => {
+            btn.addEventListener('click', () => spriteInput.click());
+        });
+
+        spriteInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    customSpriteImg = img;
-                    document.getElementById('spriteUploadLabel').textContent = '✅ Спрайт загружен!';
-                    triggerHaptic('success');
-                };
-                img.src = event.target.result;
+                applySpriteSource(event.target.result, `✅ ${file.name} (сменить)`, true);
+                triggerHaptic('success');
             };
             reader.readAsDataURL(file);
+            spriteInput.value = '';
         });
+
+        function resetCustomSprite() {
+            customSpriteImg = null;
+            try {
+                localStorage.removeItem(SPRITE_STORAGE_KEY);
+            } catch (e) {}
+            updateSpriteButtonsUI('Загрузить свой спрайт (PNG)', false);
+            triggerHaptic('impact_light');
+        }
+
+        resetSpriteBtnStart.addEventListener('click', resetCustomSprite);
+        resetSpriteBtnOver.addEventListener('click', resetCustomSprite);
 
         // Переключение звука
         document.getElementById('soundToggleBtn').addEventListener('click', () => {
@@ -390,13 +466,13 @@
         });
 
         // Адаптивный размер Canvas под экран устройства
-        let width = window.innerWidth;
-        let height = window.innerHeight;
+        let width = window.innerWidth || 390;
+        let height = window.innerHeight || 700;
         let dpr = Math.min(window.devicePixelRatio || 1, 2);
 
         function resizeCanvas() {
-            width = window.innerWidth;
-            height = window.innerHeight;
+            width = window.innerWidth || 390;
+            height = window.innerHeight || 700;
             dpr = Math.min(window.devicePixelRatio || 1, 2);
             canvas.width = width * dpr;
             canvas.height = height * dpr;
@@ -417,32 +493,30 @@
         };
 
         let currentState = GAME_STATE.MENU;
-        let isHolding = false; // Зажат ли палец / кнопка мыши / пробел
+        let isHolding = false;
         let score = 0;
         let distanceScore = 0;
         let bonusPoints = 0;
-        let gameSpeed = 240; // Базовая скорость прокрутки города (пикс/сек)
+        let gameSpeed = 240;
         let lastTime = 0;
         let propPulseTimer = 0;
-        let screenShake = 0;   // Тряска камеры при столкновении
-        let hitFlash = 0;      // Вспышка экрана при ударе
-        let cobbleOffset = 0;  // Смещение брусчатки на переднем плане
+        let screenShake = 0;
+        let hitFlash = 0;
+        let cobbleOffset = 0;
 
-        // Объект игрока (Обезьянка с пропеллером)
         const player = {
             x: 100,
             y: 250,
             vy: 0,
-            radius: 26,          // Радиус хитбокса для честных столкновений
-            energy: 100,         // Текущая энергия (0..100)
+            radius: 26,
+            energy: 100,
             maxEnergy: 100,
             propellerAngle: 0,
-            cymbalClap: 0,       // Анимация хлопка тарелками при сборе банана
-            tilt: 0,             // Наклон корпуса при полёте
-            squash: 0            // Пружинистая деформация при хлопке/взлёте
+            cymbalClap: 0,
+            tilt: 0,
+            squash: 0
         };
 
-        // Массивы игровых объектов
         let obstacles = [];
         let bananas = [];
         let particles = [];
@@ -455,14 +529,12 @@
         let obstacleSpawnTimer = 0;
         let bananaSpawnTimer = 0;
 
-        // Инициализация фонового города (многослойный параллакс в стиле европейского заката)
         function initBackground() {
             bgBuildingsFar = [];
             bgBuildingsMid = [];
             bgStreetDecor = [];
             clouds = [];
 
-            // Объёмные облака с тёплыми золотистыми краями
             for (let i = 0; i < 7; i++) {
                 clouds.push({
                     x: Math.random() * width,
@@ -472,7 +544,6 @@
                 });
             }
 
-            // Дальний силуэт города в дымке (шпили, мансарды, трубы)
             let curX = -60;
             while (curX < width + 320) {
                 const w = 75 + Math.random() * 95;
@@ -487,12 +558,11 @@
                 curX += w - 6;
             }
 
-            // Средний план: детализированные европейские таунхаусы с покатыми крышами и светящимися окнами
             const palettes = [
-                { wall: '#b86f52', trim: '#f3e5d8', roof: '#4a3b3c' }, // Тёплый терракотовый кирпич
-                { wall: '#c78a5c', trim: '#fff1e0', roof: '#3f3d47' }, // Охра / песочный
-                { wall: '#9e5846', trim: '#ead7c5', roof: '#473634' }, // Классический красный кирпич
-                { wall: '#bfa78a', trim: '#faf3eb', roof: '#454852' }  // Кремовый известняк
+                { wall: '#b86f52', trim: '#f3e5d8', roof: '#4a3b3c' },
+                { wall: '#c78a5c', trim: '#fff1e0', roof: '#3f3d47' },
+                { wall: '#9e5846', trim: '#ead7c5', roof: '#473634' },
+                { wall: '#bfa78a', trim: '#faf3eb', roof: '#454852' }
             ];
 
             curX = -60;
@@ -501,7 +571,6 @@
                 const h = height * (0.24 + Math.random() * 0.23);
                 const palette = palettes[Math.floor(Math.random() * palettes.length)];
                 const cols = Math.max(2, Math.floor(w / 38));
-                // Генерируем карту светящихся окон заранее, чтобы они не мерцали хаотично
                 const litWindows = [];
                 for (let r = 0; r < 4; r++) {
                     const rowArr = [];
@@ -516,7 +585,7 @@
                     w,
                     h,
                     palette,
-                    roofStyle: Math.floor(Math.random() * 3), // 0: мансарда, 1: фронтон, 2: плоский карниз
+                    roofStyle: Math.floor(Math.random() * 3),
                     windowsCols: cols,
                     litWindows,
                     hasBalcony: Math.random() > 0.48
@@ -524,7 +593,6 @@
                 curX += w + 8;
             }
 
-            // Декоративные фоновые фонари и кусты вдоль тротуара
             curX = 40;
             while (curX < width + 350) {
                 bgStreetDecor.push({
@@ -535,7 +603,6 @@
             }
         }
 
-        // Сброс и старт новой игры
         function startGame() {
             sfx.init();
             currentState = GAME_STATE.PLAYING;
@@ -569,7 +636,6 @@
             triggerHaptic('impact_light');
         }
 
-        // Завершение игры
         function endGame(reasonText) {
             if (currentState === GAME_STATE.GAMEOVER) return;
             currentState = GAME_STATE.GAMEOVER;
@@ -580,7 +646,6 @@
             sfx.playCrash();
             triggerHaptic('error');
 
-            // Эффект разлёта звёздочек, перьев и искр при ударе
             for (let i = 0; i < 28; i++) {
                 const angle = (Math.PI * 2 * i) / 28;
                 const speed = 100 + Math.random() * 220;
@@ -597,12 +662,13 @@
                 });
             }
 
-            // Проверка нового рекорда
             const finalScoreVal = Math.floor(score);
             const isNewRecord = finalScoreVal > bestScore;
             if (isNewRecord) {
                 bestScore = finalScoreVal;
-                localStorage.setItem('cymbal_copter_best', bestScore.toString());
+                try {
+                    localStorage.setItem('cymbal_copter_best', bestScore.toString());
+                } catch (e) {}
                 bestScoreDisplay.textContent = bestScore;
             }
 
@@ -668,7 +734,6 @@
             const roll = Math.random();
 
             if (roll < 0.48) {
-                // Тип 1: Кирпичный дымоход / башня крыши снизу
                 const obsHeight = 110 + Math.random() * (height * 0.34);
                 obstacles.push({
                     type: 'chimney',
@@ -678,7 +743,6 @@
                     h: obsHeight
                 });
             } else if (roll < 0.82) {
-                // Тип 2: Патрульный дрон в воздухе (плавно покачивается по вертикали)
                 const minY = 95;
                 const maxY = groundY - 120;
                 const baseY = minY + Math.random() * Math.max(60, maxY - minY);
@@ -692,7 +756,6 @@
                     phase: Math.random() * Math.PI * 2
                 });
             } else {
-                // Тип 3: Уличный фонарь со столбом (как на референсе)
                 const lampHeight = 150 + Math.random() * (height * 0.25);
                 obstacles.push({
                     type: 'lamp',
@@ -706,7 +769,7 @@
 
         function spawnBananaArc() {
             const groundY = height - 48;
-            const count = 3 + Math.floor(Math.random() * 3); // Дуга из 3-5 бананов
+            const count = 3 + Math.floor(Math.random() * 3);
             const startY = 120 + Math.random() * (groundY - 240);
             const arcCurve = (Math.random() - 0.5) * 90;
 
@@ -729,22 +792,19 @@
          * ============================================================================
          */
         function update(dt) {
-            // Ограничиваем dt при сворачивании вкладки
             if (dt > 0.05) dt = 0.05;
 
-            // Затухание тряски экрана и вспышки
             if (screenShake > 0) screenShake = Math.max(0, screenShake - dt * 48);
             if (hitFlash > 0) hitFlash = Math.max(0, hitFlash - dt * 2.2);
 
-            // Анимация облаков даже в меню
             clouds.forEach(c => {
                 c.x -= c.speed * dt;
                 if (c.x < -160) c.x = width + 160;
             });
 
             if (currentState !== GAME_STATE.PLAYING) {
-                // В меню обезьянка плавно парит на месте с вращающимся пропеллером
                 player.propellerAngle += 22 * dt;
+                player.x = Math.min(118, width * 0.22);
                 player.y = height * 0.44 + Math.sin(performance.now() * 0.004) * 12;
                 player.tilt = Math.sin(performance.now() * 0.0025) * 0.05;
                 updateParticles(dt);
@@ -752,13 +812,11 @@
                 return;
             }
 
-            // Постепенное ускорение темпа игры
             gameSpeed += 4.5 * dt;
             distanceScore += (gameSpeed * dt) * 0.035;
             score = distanceScore + bonusPoints;
             cobbleOffset = (cobbleOffset + gameSpeed * dt) % 48;
 
-            // Движение многослойного параллакс-города
             bgBuildingsFar.forEach(b => {
                 b.x -= gameSpeed * 0.18 * dt;
                 if (b.x + b.w < -30) {
@@ -783,26 +841,22 @@
                 }
             });
 
-            // Физика Jetpack-пропеллера и расход энергии
-            const gravity = 860;         // Сила тяжести вниз
-            const thrustAccel = -1680;   // Подъёмная тяга пропеллера вверх
-            const drainRate = 24;        // Расход энергии в секунду при удержании
-            const regenRate = 6.5;       // Медленное восстановление при планировании
+            const gravity = 860;
+            const thrustAccel = -1680;
+            const drainRate = 24;
+            const regenRate = 6.5;
 
             if (isHolding && player.energy > 0) {
-                // Включаем тягу вверх
                 player.vy += (thrustAccel + gravity) * dt;
                 player.energy = Math.max(0, player.energy - drainRate * dt);
                 player.propellerAngle += 46 * dt;
 
-                // Звуковой импульс и поток воздуха от пропеллера
                 propPulseTimer -= dt;
                 if (propPulseTimer <= 0) {
                     sfx.playPropellerPulse();
                     propPulseTimer = 0.09;
                 }
 
-                // Создаём воздушные кольца и потоки ветра над кепкой
                 if (Math.random() < 0.75) {
                     particles.push({
                         x: player.x + (Math.random() - 0.5) * 38,
@@ -817,21 +871,17 @@
                     });
                 }
             } else {
-                // Свободное планирование вниз
                 player.vy += gravity * dt;
                 player.energy = Math.min(player.maxEnergy, player.energy + regenRate * dt);
                 player.propellerAngle += 15 * dt;
             }
 
-            // Ограничение максимальной скорости падения и взлёта
             player.vy = Math.max(-440, Math.min(480, player.vy));
             player.y += player.vy * dt;
 
-            // Плавный наклон персонажа по направлению полёта
             const targetTilt = Math.max(-0.26, Math.min(0.32, player.vy * 0.00072));
             player.tilt += (targetTilt - player.tilt) * 10 * dt;
 
-            // Затухание анимации хлопка тарелками и пружины
             if (player.cymbalClap > 0) {
                 player.cymbalClap = Math.max(0, player.cymbalClap - dt * 3.8);
             }
@@ -839,14 +889,12 @@
                 player.squash = Math.max(0, player.squash - dt * 4.5);
             }
 
-            // Верхняя граница неба (не даём улететь за экран)
             const ceilingY = 68;
             if (player.y < ceilingY) {
                 player.y = ceilingY;
                 if (player.vy < 0) player.vy = 0;
             }
 
-            // Проверка падения на мостовую
             const groundY = height - 52;
             if (player.y + player.radius >= groundY) {
                 player.y = groundY - player.radius;
@@ -854,7 +902,6 @@
                 return;
             }
 
-            // Спавн препятствий
             obstacleSpawnTimer -= dt;
             if (obstacleSpawnTimer <= 0) {
                 spawnObstacle();
@@ -862,14 +909,12 @@
                 obstacleSpawnTimer = interval + Math.random() * 0.5;
             }
 
-            // Спавн бананов
             bananaSpawnTimer -= dt;
             if (bananaSpawnTimer <= 0) {
                 spawnBananaArc();
                 bananaSpawnTimer = 2.4 + Math.random() * 1.4;
             }
 
-            // Обновление и проверка столкновений с препятствиями
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 const obs = obstacles[i];
                 obs.x -= gameSpeed * dt;
@@ -878,7 +923,6 @@
                     obs.phase += 4.2 * dt;
                     obs.y = obs.baseY + Math.sin(obs.phase) * 26;
                 } else if (obs.type === 'chimney' && Math.random() < 0.14) {
-                    // Дымок из кирпичных труб
                     particles.push({
                         x: obs.x + obs.w * 0.5 + (Math.random() - 0.5) * 14,
                         y: obs.y - 6,
@@ -892,7 +936,6 @@
                     });
                 }
 
-                // Проверка пересечения круга игрока с прямоугольником препятствия (с комфортным допуском)
                 const pad = 6;
                 if (circleRectCollision(
                     player.x, player.y, player.radius - 3,
@@ -912,7 +955,6 @@
                 }
             }
 
-            // Обновление и сбор бананов
             for (let i = bananas.length - 1; i >= 0; i--) {
                 const b = bananas[i];
                 b.x -= gameSpeed * dt;
@@ -921,15 +963,13 @@
 
                 const dist = Math.hypot(player.x - b.x, player.y - currentY);
                 if (dist < player.radius + b.radius + 8) {
-                    // Банан собран!
                     bonusPoints += 15;
                     player.energy = Math.min(player.maxEnergy, player.energy + 24);
-                    player.cymbalClap = 1.0; // Обезьянка радостно бьёт в тарелки
-                    player.squash = 1.0;     // Пружинистый отскок
+                    player.cymbalClap = 1.0;
+                    player.squash = 1.0;
                     sfx.playBanana();
                     triggerHaptic('impact_light');
 
-                    // Всплывающий текст "+15 ⚡"
                     floatingTexts.push({
                         x: b.x,
                         y: currentY - 12,
@@ -939,7 +979,6 @@
                         text: '+15 ⚡'
                     });
 
-                    // Золотые брызги и ударная волна от тарелок
                     for (let p = 0; p < 14; p++) {
                         const a = (Math.PI * 2 * p) / 14;
                         const spd = 80 + Math.random() * 90;
@@ -990,7 +1029,6 @@
             }
         }
 
-        // Проверка пересечения окружности и прямоугольника
         function circleRectCollision(cx, cy, cr, rx, ry, rw, rh) {
             const closestX = Math.max(rx, Math.min(cx, rx + rw));
             const closestY = Math.max(ry, Math.min(cy, ry + rh));
@@ -999,7 +1037,6 @@
             return (dx * dx + dy * dy) < (cr * cr);
         }
 
-        // Обновление UI (Счёт и Шкала Энергии)
         function updateHUD() {
             scoreDisplay.textContent = Math.floor(score);
             const pct = Math.round(player.energy);
@@ -1030,14 +1067,13 @@
             const groundY = height - 52;
 
             ctx.save();
-            // Применяем тряску камеры при столкновении
             if (screenShake > 0) {
                 const dx = (Math.random() - 0.5) * screenShake;
                 const dy = (Math.random() - 0.5) * screenShake;
                 ctx.translate(dx, dy);
             }
 
-            // 1. Богатый градиент тёплого золотистого неба (Golden Hour)
+            // 1. Градиент золотого часа
             const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
             skyGrad.addColorStop(0, '#3b73a8');
             skyGrad.addColorStop(0.42, '#7db1d8');
@@ -1046,7 +1082,7 @@
             ctx.fillStyle = skyGrad;
             ctx.fillRect(0, 0, width, height);
 
-            // Объёмное солнце с мягким ореолом и лучами
+            // Солнце
             const sunX = width * 0.78;
             const sunY = height * 0.24;
             const sunHalo = ctx.createRadialGradient(sunX, sunY, 12, sunX, sunY, 190);
@@ -1058,19 +1094,17 @@
             ctx.arc(sunX, sunY, 190, 0, Math.PI * 2);
             ctx.fill();
 
-            // 2. Объёмные многослойные облака с тёплой подсветкой
+            // 2. Объёмные облака
             clouds.forEach(c => {
                 ctx.save();
                 ctx.translate(c.x, c.y);
                 ctx.scale(c.scale, c.scale);
-                // Тень облака снизу
                 ctx.fillStyle = 'rgba(186, 175, 195, 0.35)';
                 ctx.beginPath();
                 ctx.arc(0, 6, 26, 0, Math.PI * 2);
                 ctx.arc(24, 4, 30, 0, Math.PI * 2);
                 ctx.arc(50, 6, 24, 0, Math.PI * 2);
                 ctx.fill();
-                // Светлая шапка облака
                 ctx.fillStyle = 'rgba(255, 251, 242, 0.82)';
                 ctx.beginPath();
                 ctx.arc(0, 0, 26, 0, Math.PI * 2);
@@ -1080,7 +1114,7 @@
                 ctx.restore();
             });
 
-            // 3. Дальний силуэт европейского города в атмосферной дымке
+            // 3. Дальний силуэт города
             bgBuildingsFar.forEach(b => {
                 const topY = groundY - b.h;
                 const farGrad = ctx.createLinearGradient(0, topY, 0, groundY);
@@ -1100,40 +1134,35 @@
                 if (b.hasSpire) {
                     ctx.fillRect(b.x + b.w * 0.5 - 3, topY - 38, 6, 38);
                 }
-                // Дымоходы на дальних крышах
                 ctx.fillRect(b.x + 14, topY - 14, 10, 14);
                 ctx.fillRect(b.x + b.w - 26, topY - 18, 12, 18);
             });
 
-            // Мягкая атмосферная дымка между дальним и средним планом
+            // Атмосферная дымка
             const hazeGrad = ctx.createLinearGradient(0, groundY - 220, 0, groundY);
             hazeGrad.addColorStop(0, 'rgba(244, 198, 150, 0)');
             hazeGrad.addColorStop(1, 'rgba(244, 198, 150, 0.35)');
             ctx.fillStyle = hazeGrad;
             ctx.fillRect(0, groundY - 220, width, 220);
 
-            // 4. Средний план: детализированные кирпичные дома с окнами, карнизами и мансардами
+            // 4. Средний план: кирпичные таунхаусы со светящимися окнами
             bgBuildingsMid.forEach(b => {
                 const topY = groundY - b.h;
 
-                // Основная стена с мягким затенением книзу
                 const wallGrad = ctx.createLinearGradient(b.x, topY, b.x, groundY);
                 wallGrad.addColorStop(0, b.palette.wall);
                 wallGrad.addColorStop(1, '#5c3c32');
                 ctx.fillStyle = wallGrad;
                 ctx.fillRect(b.x, topY, b.w, b.h);
 
-                // Декоративная кирпичная текстура на фасаде
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
                 for (let by = topY + 18; by < groundY - 20; by += 28) {
                     ctx.fillRect(b.x + 10, by, 18, 6);
                     ctx.fillRect(b.x + b.w - 32, by + 12, 18, 6);
                 }
 
-                // Крыша (мансарда или фронтон)
                 ctx.fillStyle = b.palette.roof;
                 if (b.roofStyle === 0) {
-                    // Трапециевидная мансардная крыша
                     ctx.beginPath();
                     ctx.moveTo(b.x - 5, topY);
                     ctx.lineTo(b.x + 14, topY - 24);
@@ -1142,7 +1171,6 @@
                     ctx.closePath();
                     ctx.fill();
                 } else if (b.roofStyle === 1) {
-                    // Треугольный фронтон
                     ctx.beginPath();
                     ctx.moveTo(b.x - 5, topY);
                     ctx.lineTo(b.x + b.w * 0.5, topY - 28);
@@ -1151,13 +1179,11 @@
                     ctx.fill();
                 }
 
-                // Рельефный карниз крыши
                 ctx.fillStyle = b.palette.trim;
                 ctx.fillRect(b.x - 5, topY - 5, b.w + 10, 7);
                 ctx.fillStyle = 'rgba(0,0,0,0.22)';
                 ctx.fillRect(b.x - 4, topY + 2, b.w + 8, 4);
 
-                // Окна с рамами и тёплым вечерним светом
                 const cols = b.windowsCols;
                 const padX = b.w / (cols + 1);
                 for (let row = 0; row < 3; row++) {
@@ -1167,12 +1193,10 @@
                         const winX = b.x + col * padX - 11;
                         const isLit = b.litWindows[row] && b.litWindows[row][col - 1];
 
-                        // Подоконник и наличник
                         ctx.fillStyle = b.palette.trim;
                         ctx.fillRect(winX - 3, winY - 3, 28, 36);
                         ctx.fillRect(winX - 5, winY + 31, 32, 4);
 
-                        // Стекло (тёплый янтарный свет или глубокое вечернее отражение)
                         if (isLit) {
                             const winGlow = ctx.createLinearGradient(winX, winY, winX, winY + 30);
                             winGlow.addColorStop(0, '#fde68a');
@@ -1183,7 +1207,6 @@
                         }
                         ctx.fillRect(winX, winY, 22, 30);
 
-                        // Переплёт рамы
                         ctx.fillStyle = b.palette.trim;
                         ctx.fillRect(winX + 10, winY, 2, 30);
                         ctx.fillRect(winX, winY + 13, 22, 2);
@@ -1191,13 +1214,11 @@
                 }
             });
 
-            // 4.5. Декоративные уличные фонари и деревья на тротуаре (глубина сцены)
+            // 4.5. Уличные фонари и деревья
             bgStreetDecor.forEach(d => {
                 if (d.type === 'tree') {
-                    // Ствол
                     ctx.fillStyle = '#4a3222';
                     ctx.fillRect(d.x - 4, groundY - 38, 8, 38);
-                    // Пышная осенне-зелёная крона
                     ctx.fillStyle = '#3f6212';
                     ctx.beginPath();
                     ctx.arc(d.x, groundY - 46, 22, 0, Math.PI * 2);
@@ -1209,7 +1230,6 @@
                     ctx.arc(d.x - 4, groundY - 50, 14, 0, Math.PI * 2);
                     ctx.fill();
                 } else {
-                    // Фоновый декоративный фонарь
                     ctx.fillStyle = '#292524';
                     ctx.fillRect(d.x - 2, groundY - 64, 4, 64);
                     ctx.fillStyle = 'rgba(253, 224, 71, 0.35)';
@@ -1225,22 +1245,18 @@
 
             // 5. Игровые препятствия
             obstacles.forEach(obs => {
-                if (obs.type === 'chimney') {
-                    drawChimneyObstacle(obs);
-                } else if (obs.type === 'drone') {
-                    drawDroneObstacle(obs);
-                } else if (obs.type === 'lamp') {
-                    drawLampObstacle(obs);
-                }
+                if (obs.type === 'chimney') drawChimneyObstacle(obs);
+                else if (obs.type === 'drone') drawDroneObstacle(obs);
+                else if (obs.type === 'lamp') drawLampObstacle(obs);
             });
 
-            // 6. Бананы (энергия и бонусы)
+            // 6. Бананы
             bananas.forEach(b => {
                 const curY = b.y + Math.sin(b.bobPhase) * 6;
                 drawBanana(b.x, curY);
             });
 
-            // 7. Детализированная европейская мостовая / брусчатка на переднем плане
+            // 7. Брусчатка на переднем плане
             const groundGrad = ctx.createLinearGradient(0, groundY, 0, height);
             groundGrad.addColorStop(0, '#57534e');
             groundGrad.addColorStop(0.25, '#44403c');
@@ -1248,13 +1264,11 @@
             ctx.fillStyle = groundGrad;
             ctx.fillRect(0, groundY, width, height - groundY);
 
-            // Бордюрный камень с бликом
             ctx.fillStyle = '#a8a29e';
             ctx.fillRect(0, groundY, width, 7);
             ctx.fillStyle = '#78716c';
             ctx.fillRect(0, groundY + 7, width, 4);
 
-            // Камни брусчатки
             ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
             for (let gx = -cobbleOffset; gx < width + 48; gx += 48) {
                 ctx.beginPath();
@@ -1263,7 +1277,7 @@
                 ctx.fill();
             }
 
-            // 8. Частицы воздуха, дыма и искр
+            // 8. Частицы
             particles.forEach(p => {
                 ctx.save();
                 ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
@@ -1274,10 +1288,10 @@
                 ctx.restore();
             });
 
-            // 9. Главный герой — Обезьянка с пропеллером и медными тарелками
+            // 9. Главный герой
             drawMonkeyCharacter(player.x, player.y, player.tilt);
 
-            // 10. Всплывающие очки ("+15 ⚡")
+            // 10. Всплывающие бонусы
             floatingTexts.forEach(ft => {
                 ctx.save();
                 ctx.globalAlpha = Math.max(0, ft.life / ft.maxLife);
@@ -1291,7 +1305,6 @@
                 ctx.restore();
             });
 
-            // Вспышка при ударе
             if (hitFlash > 0) {
                 ctx.fillStyle = `rgba(255, 255, 255, ${hitFlash * 0.45})`;
                 ctx.fillRect(-20, -20, width + 40, height + 40);
@@ -1300,7 +1313,6 @@
             ctx.restore();
         }
 
-        // Отрисовка объёмного кирпичного дымохода с раствором и терракотовым оголовком
         function drawChimneyObstacle(obs) {
             const grad = ctx.createLinearGradient(obs.x, obs.y, obs.x + obs.w, obs.y);
             grad.addColorStop(0, '#b4533c');
@@ -1311,19 +1323,16 @@
             ctx.roundRect(obs.x, obs.y + 10, obs.w, obs.h - 10, 4);
             ctx.fill();
 
-            // Обводка
             ctx.strokeStyle = '#451a03';
             ctx.lineWidth = 2;
             ctx.strokeRect(obs.x, obs.y + 10, obs.w, obs.h - 10);
 
-            // Кирпичная кладка со светлым раствором
             ctx.fillStyle = 'rgba(255, 237, 213, 0.16)';
             for (let y = obs.y + 22; y < obs.y + obs.h - 12; y += 20) {
                 ctx.fillRect(obs.x + 6, y, 22, 9);
                 ctx.fillRect(obs.x + 34, y + 9, 22, 9);
             }
 
-            // Каменный карниз трубы сверху
             const capGrad = ctx.createLinearGradient(obs.x - 7, obs.y, obs.x + obs.w + 7, obs.y);
             capGrad.addColorStop(0, '#78716c');
             capGrad.addColorStop(0.5, '#57534e');
@@ -1337,11 +1346,9 @@
             ctx.stroke();
         }
 
-        // Отрисовка старинного уличного фонаря с тёплым свечением
         function drawLampObstacle(obs) {
             const centerX = obs.x + obs.w / 2;
 
-            // Тёплый световой ореол вокруг стеклянного плафона
             const glow = ctx.createRadialGradient(centerX, obs.y + 22, 4, centerX, obs.y + 22, 46);
             glow.addColorStop(0, 'rgba(254, 240, 138, 0.85)');
             glow.addColorStop(0.5, 'rgba(250, 204, 21, 0.28)');
@@ -1351,20 +1358,17 @@
             ctx.arc(centerX, obs.y + 22, 46, 0, Math.PI * 2);
             ctx.fill();
 
-            // Чугунный резной столб
             const poleGrad = ctx.createLinearGradient(centerX - 5, 0, centerX + 5, 0);
             poleGrad.addColorStop(0, '#52525b');
             poleGrad.addColorStop(0.5, '#27272a');
             poleGrad.addColorStop(1, '#09090b');
             ctx.fillStyle = poleGrad;
             ctx.fillRect(centerX - 4, obs.y + 34, 8, obs.h - 34);
-            // Основание и перекладина
             ctx.beginPath();
             ctx.roundRect(centerX - 11, obs.y + obs.h - 18, 22, 18, 4);
             ctx.roundRect(centerX - 12, obs.y + 38, 24, 4, 2);
             ctx.fill();
 
-            // Светящийся стеклянный фонарь
             ctx.fillStyle = '#fef9c3';
             ctx.strokeStyle = '#18181b';
             ctx.lineWidth = 2;
@@ -1377,7 +1381,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Кованая крышка фонаря со шпилем
             ctx.fillStyle = '#18181b';
             ctx.beginPath();
             ctx.moveTo(centerX, obs.y - 4);
@@ -1387,12 +1390,10 @@
             ctx.fill();
         }
 
-        // Отрисовка патрульного дрона с мигающим сенсором и винтами
         function drawDroneObstacle(obs) {
             const cx = obs.x + obs.w / 2;
             const cy = obs.y + obs.h / 2;
 
-            // Стойки винтов
             ctx.strokeStyle = '#1e293b';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -1402,7 +1403,6 @@
             ctx.lineTo(obs.x + obs.w - 12, obs.y + 5);
             ctx.stroke();
 
-            // Обтекаемый металлический корпус
             const bodyGrad = ctx.createLinearGradient(obs.x, obs.y + 8, obs.x, obs.y + 28);
             bodyGrad.addColorStop(0, '#64748b');
             bodyGrad.addColorStop(0.5, '#334155');
@@ -1415,7 +1415,6 @@
             ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Красный пульсирующий сенсор-глаз
             const pulse = 0.6 + 0.4 * Math.sin(performance.now() * 0.015);
             ctx.fillStyle = `rgba(239, 68, 68, ${pulse * 0.45})`;
             ctx.beginPath();
@@ -1431,7 +1430,6 @@
             ctx.arc(cx - 1.5, cy + 1.5, 1.8, 0, Math.PI * 2);
             ctx.fill();
 
-            // Вращающиеся лопасти роторов
             const bladeW = 22 + Math.sin(performance.now() * 0.05) * 8;
             ctx.fillStyle = 'rgba(226, 232, 240, 0.85)';
             ctx.beginPath();
@@ -1440,12 +1438,10 @@
             ctx.fill();
         }
 
-        // Отрисовка глянцевого светящегося банана
         function drawBanana(x, y) {
             ctx.save();
             ctx.translate(x, y);
 
-            // Пульсирующее золотое сияние
             const pulse = 1 + Math.sin(performance.now() * 0.008) * 0.12;
             const halo = ctx.createRadialGradient(0, 0, 3, 0, 0, 24 * pulse);
             halo.addColorStop(0, 'rgba(254, 240, 138, 0.75)');
@@ -1456,7 +1452,6 @@
             ctx.arc(0, 0, 24 * pulse, 0, Math.PI * 2);
             ctx.fill();
 
-            // Сам банан с объёмным градиентом
             ctx.rotate(-0.35);
             const banGrad = ctx.createLinearGradient(-12, -12, 12, 12);
             banGrad.addColorStop(0, '#fef08a');
@@ -1473,7 +1468,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Кончик банана
             ctx.fillStyle = '#713f12';
             ctx.beginPath();
             ctx.arc(13, 3, 2, 0, Math.PI * 2);
@@ -1482,26 +1476,55 @@
             ctx.restore();
         }
 
-        // Высокодетализированная иллюстрация обезьянки в кепке с пропеллером и тарелками
         function drawMonkeyCharacter(x, y, tilt) {
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(tilt);
 
-            // Пружинистый эффект squash & stretch при сборе бонуса
             const sx = 1 + player.squash * 0.12;
             const sy = 1 - player.squash * 0.1;
             ctx.scale(sx, sy);
 
-            // Если пользователь загрузил собственный PNG-спрайт
-            if (customSpriteImg) {
-                const spriteSize = 88;
-                ctx.drawImage(customSpriteImg, -spriteSize / 2, -spriteSize / 2, spriteSize, spriteSize);
+            if (customSpriteImg && customSpriteImg.naturalWidth > 0) {
+                const targetH = 92;
+                const scale = targetH / customSpriteImg.naturalHeight;
+                const drawW = customSpriteImg.naturalWidth * scale;
+                const drawH = targetH;
+
+                if (player.cymbalClap > 0.1) {
+                    ctx.save();
+                    ctx.strokeStyle = `rgba(253, 224, 71, ${player.cymbalClap * 0.85})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 8, (1.15 - player.cymbalClap) * 48, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                ctx.drawImage(customSpriteImg, -drawW / 2, -drawH / 2, drawW, drawH);
+
+                // Эффект вращающегося размытия над кепкой при активной тяге
+                const thrusting = currentState === GAME_STATE.PLAYING && isHolding && player.energy > 0;
+                const bladeSpan = Math.abs(Math.cos(player.propellerAngle)) * (thrusting ? 26 : 16) + 6;
+                ctx.save();
+                ctx.translate(0, -drawH * 0.44);
+                if (thrusting) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, 30, 4.5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.72)';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, bladeSpan, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
                 ctx.restore();
                 return;
             }
 
-            // 1. Изогнутый хвост сзади
+            // 1. Хвост
             ctx.strokeStyle = '#451a03';
             ctx.lineWidth = 6.5;
             ctx.lineCap = 'round';
@@ -1517,7 +1540,7 @@
             ctx.quadraticCurveTo(-32, 9, -28, -5);
             ctx.stroke();
 
-            // 2. Синие джинсы с бликами и строчкой
+            // 2. Джинсы
             const jeansGrad = ctx.createLinearGradient(-14, 10, 14, 28);
             jeansGrad.addColorStop(0, '#3b82f6');
             jeansGrad.addColorStop(1, '#1d4ed8');
@@ -1531,7 +1554,7 @@
             ctx.fill();
             ctx.stroke();
 
-            // Золотисто-охристые лапки
+            // Лапки
             ctx.fillStyle = '#eab308';
             ctx.strokeStyle = '#713f12';
             ctx.lineWidth = 1.8;
@@ -1541,7 +1564,7 @@
             ctx.fill();
             ctx.stroke();
 
-            // 3. Коричневый свитер с объёмным шейдингом и воротничком
+            // 3. Свитер
             const sweaterGrad = ctx.createRadialGradient(-4, 0, 3, 0, 4, 22);
             sweaterGrad.addColorStop(0, '#9a5128');
             sweaterGrad.addColorStop(1, '#5c2c10');
@@ -1553,10 +1576,9 @@
             ctx.fill();
             ctx.stroke();
 
-            // 4. Руки и блестящие медные музыкальные тарелки (Cymbals)
+            // 4. Руки и медные тарелки
             const clapOffset = player.cymbalClap * 10;
 
-            // Ударная звуковая волна при хлопке тарелками!
             if (player.cymbalClap > 0.1) {
                 ctx.save();
                 ctx.strokeStyle = `rgba(253, 224, 71, ${player.cymbalClap * 0.8})`;
@@ -1567,7 +1589,6 @@
                 ctx.restore();
             }
 
-            // Левая рука + тарелка
             ctx.fillStyle = '#7c3f1d';
             ctx.strokeStyle = '#3b1704';
             ctx.lineWidth = 1.8;
@@ -1587,7 +1608,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Правая рука + тарелка
             ctx.fillStyle = '#7c3f1d';
             ctx.beginPath();
             ctx.roundRect(14.5 - clapOffset, -3, 9.5, 16, 4.5);
@@ -1604,8 +1624,7 @@
             ctx.fill();
             ctx.stroke();
 
-            // 5. Голова обезьянки с выразительной мимикой
-            // Уши с внутренней раковиной
+            // 5. Голова и уши
             ctx.fillStyle = '#d97706';
             ctx.strokeStyle = '#78350f';
             ctx.lineWidth = 2;
@@ -1621,7 +1640,6 @@
             ctx.arc(18, -16, 4, 0, Math.PI * 2);
             ctx.fill();
 
-            // Основной объём головы
             const headGrad = ctx.createRadialGradient(-4, -22, 4, 0, -16, 19);
             headGrad.addColorStop(0, '#d97706');
             headGrad.addColorStop(1, '#92400e');
@@ -1633,7 +1651,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Светлая мордочка с мягким контуром
             const muzzleGrad = ctx.createRadialGradient(2, -14, 2, 2, -12, 14);
             muzzleGrad.addColorStop(0, '#fef3c7');
             muzzleGrad.addColorStop(1, '#f5d08a');
@@ -1645,7 +1662,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Ноздри и сосредоточенный рот
             ctx.fillStyle = '#78350f';
             ctx.beginPath();
             ctx.arc(0, -14.5, 1.3, 0, Math.PI * 2);
@@ -1659,7 +1675,6 @@
             ctx.quadraticCurveTo(2, -9.5, 8, -8.5);
             ctx.stroke();
 
-            // Большие выразительные глаза со зрачками, следящими за высотой полёта
             ctx.fillStyle = '#ffffff';
             ctx.strokeStyle = '#451a03';
             ctx.lineWidth = 1.5;
@@ -1676,18 +1691,16 @@
             ctx.arc(8.7, -20.5 + pupilOffsetY, 2.5, 0, Math.PI * 2);
             ctx.fill();
 
-            // Живые блики в глазах
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
             ctx.arc(-3.6, -21.5 + pupilOffsetY, 1, 0, Math.PI * 2);
             ctx.arc(7.9, -21.5 + pupilOffsetY, 1, 0, Math.PI * 2);
             ctx.fill();
 
-            // 6. Яркая 4-цветная кепка с глянцевым бликом
+            // 6. Цветная кепка
             ctx.strokeStyle = '#1e293b';
             ctx.lineWidth = 1.8;
 
-            // Синий сектор
             ctx.fillStyle = '#2563eb';
             ctx.beginPath();
             ctx.arc(0, -25.5, 15.5, Math.PI, Math.PI * 1.35);
@@ -1696,7 +1709,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Красный сектор
             ctx.fillStyle = '#dc2626';
             ctx.beginPath();
             ctx.arc(0, -25.5, 15.5, Math.PI * 1.35, Math.PI * 1.7);
@@ -1705,7 +1717,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Зелёный сектор
             ctx.fillStyle = '#16a34a';
             ctx.beginPath();
             ctx.arc(0, -25.5, 15.5, Math.PI * 1.7, Math.PI * 2);
@@ -1714,19 +1725,17 @@
             ctx.fill();
             ctx.stroke();
 
-            // Зелёный козырёк кепки с обводкой
             ctx.fillStyle = '#15803d';
             ctx.beginPath();
             ctx.ellipse(11.5, -25.5, 11.5, 3.8, 0.08, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
 
-            // 7. Вращающийся красный пропеллер с эффектом размытия скорости (Motion Blur)
+            // 7. Пропеллер
             ctx.fillStyle = '#1d4ed8';
             ctx.fillRect(-2.2, -45, 4.4, 6);
 
             const bladeSpan = Math.cos(player.propellerAngle) * 28;
-            // Полупрозрачный диск размытия при активной тяге
             if (isHolding && player.energy > 0) {
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
                 ctx.beginPath();
@@ -1734,7 +1743,6 @@
                 ctx.fill();
             }
 
-            // Сами лопасти пропеллера
             ctx.fillStyle = '#ef4444';
             ctx.strokeStyle = '#991b1b';
             ctx.lineWidth = 1.2;
@@ -1743,7 +1751,6 @@
             ctx.fill();
             ctx.stroke();
 
-            // Центральный колпачок пропеллера
             ctx.fillStyle = '#facc15';
             ctx.beginPath();
             ctx.arc(0, -45, 3, 0, Math.PI * 2);
@@ -1768,7 +1775,6 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Запуск при загрузке окна
         window.onload = function () {
             initBackground();
             requestAnimationFrame(gameLoop);
