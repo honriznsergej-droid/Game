@@ -6,7 +6,7 @@
   <title>Monkey Propeller Jetpack</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    * {
+- {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
@@ -262,7 +262,7 @@
 
       <div class="hud-right">
         <div class="stat-pill">
-          <div class="stat-title">Бананы</div>
+          <div class="stat-title">Очки</div>
           <div class="stat-value" id="scoreVal">0</div>
         </div>
         <div class="stat-pill">
@@ -295,7 +295,7 @@
         <div class="final-stats">
           <div class="final-box">
             <div class="num" id="finalScore">0</div>
-            <div class="lbl">БАНАНЫ</div>
+            <div class="lbl">ОЧКИ</div>
           </div>
           <div class="final-box">
             <div class="num" id="finalBest">0</div>
@@ -465,14 +465,6 @@
     let midBuildings = [];
     let streetProps = [];
 
-    function randomDubaiStyle() {
-      const r = Math.random();
-      if (r < 0.24) return 'burj';
-      if (r < 0.48) return 'twist';
-      if (r < 0.68) return 'sail';
-      return 'glass';
-    }
-
     function initScenery() {
       clouds = Array.from({ length: 6 }, (_, i) => ({
         x: (width / 5) * i + Math.random() * 80,
@@ -483,29 +475,30 @@
 
       farBuildings = [];
       let fx = -40;
-      while (fx < width + 240) {
-        const bw = 60 + Math.random() * 65;
-        const bh = 120 + Math.random() * 155;
+      while (fx < width + 220) {
+        const bw = 65 + Math.random() * 75;
+        const bh = 95 + Math.random() * 125;
         farBuildings.push({
           x: fx,
           w: bw,
           h: bh,
-          style: randomDubaiStyle()
+          hasSpire: Math.random() < 0.25,
+          hueShift: Math.random() * 12 - 6
         });
-        fx += bw + 10;
+        fx += bw + 6;
       }
 
       midBuildings = [];
       let mx = -60;
-      while (mx < width + 280) {
-        const bw = 96 + Math.random() * 68;
-        const bh = 145 + Math.random() * 145;
-        const cols = Math.max(3, Math.floor((bw - 20) / 22));
-        const rows = Math.max(4, Math.floor((bh - 30) / 28));
+      while (mx < width + 260) {
+        const bw = 105 + Math.random() * 75;
+        const bh = 120 + Math.random() * 110;
+        const cols = Math.max(2, Math.floor((bw - 24) / 28));
+        const rows = Math.max(2, Math.floor((bh - 36) / 34));
         const litWindows = [];
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
-            litWindows.push(Math.random() < 0.42);
+            litWindows.push(Math.random() < 0.36);
           }
         }
         midBuildings.push({
@@ -515,10 +508,9 @@
           cols,
           rows,
           litWindows,
-          tone: Math.floor(Math.random() * 3),
-          style: randomDubaiStyle()
+          tone: Math.floor(Math.random() * 3)
         });
-        mx += bw + 18;
+        mx += bw + 14;
       }
 
       streetProps = [];
@@ -541,6 +533,7 @@
     let state = 'menu';
     let holding = false;
     let score = 0;
+    let distanceAccumulator = 0;
     let worldSpeed = 210;
     let screenShake = 0;
     let hitFlash = 0;
@@ -580,6 +573,7 @@
       particles = [];
       floatingTexts = [];
       score = 0;
+      distanceAccumulator = 0;
       worldSpeed = 215;
       screenShake = 0;
       hitFlash = 0;
@@ -649,3 +643,676 @@
           e.preventDefault();
           setHolding(true);
         }
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        setHolding(false);
+      }
+    });
+
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+
+    function spawnObstacle() {
+      const playableTop = 74;
+      const playableBottom = height - groundHeight - 18;
+      const playableH = Math.max(160, playableBottom - playableTop);
+
+      const typeRoll = Math.random();
+      if (typeRoll < 0.42) {
+        const w = 44;
+        const h = Math.min(150, Math.max(68, playableH * (0.18 + Math.random() * 0.16)));
+        const fromTop = Math.random() < 0.5;
+        obstacles.push({
+          kind: 'chimney',
+          x: width + 40,
+          y: fromTop ? playableTop : playableBottom - h,
+          w,
+          h,
+          fromTop,
+          smokeTimer: 0
+        });
+      } else if (typeRoll < 0.76) {
+        const w = 30;
+        const h = Math.min(125, Math.max(62, playableH * (0.15 + Math.random() * 0.14)));
+        obstacles.push({
+          kind: 'post',
+          x: width + 40,
+          y: playableBottom - h,
+          w,
+          h
+        });
+      } else {
+        const r = 22;
+        const cy = playableTop + 36 + Math.random() * Math.max(60, playableH - 72);
+        obstacles.push({
+          kind: 'drone',
+          x: width + 40,
+          y: cy,
+          baseY: cy,
+          r,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    function spawnBananaArc() {
+      const playableTop = 84;
+      const playableBottom = height - groundHeight - 36;
+      const midY = playableTop + Math.random() * Math.max(60, playableBottom - playableTop);
+      const count = 4;
+      const spacing = 42;
+      const startX = width + 50;
+
+      for (let i = 0; i < count; i++) {
+        const norm = (i / (count - 1)) * 2 - 1;
+        const arcOffset = (1 - norm * norm) * -36;
+        const by = Math.max(playableTop, Math.min(playableBottom, midY + arcOffset));
+        bananas.push({
+          x: startX + i * spacing,
+          y: by,
+          r: 16,
+          bobPhase: i * 0.6,
+          collected: false
+        });
+      }
+    }
+
+    function addParticles(x, y, count, colors, speedRange = [40, 140]) {
+      for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = speedRange[0] + Math.random() * (speedRange[1] - speedRange[0]);
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd - 20,
+          life: 0.35 + Math.random() * 0.35,
+          maxLife: 0.7,
+          size: 3 + Math.random() * 4,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        });
+      }
+    }
+
+    function addFloatingText(x, y, text, color = '#ffe066') {
+      floatingTexts.push({
+        x,
+        y,
+        vy: -48,
+        text,
+        color,
+        life: 0.85,
+        maxLife: 0.85
+      });
+    }
+
+    function circleRectCollide(cx, cy, cr, rx, ry, rw, rh) {
+      const closestX = Math.max(rx, Math.min(cx, rx + rw));
+      const closestY = Math.max(ry, Math.min(cy, ry + rh));
+      const dx = cx - closestX;
+      const dy = cy - closestY;
+      return (dx * dx + dy * dy) < (cr * cr);
+    }
+
+    function update(dt) {
+      elapsed += dt;
+
+      if (screenShake > 0) screenShake = Math.max(0, screenShake - dt * 36);
+      if (hitFlash > 0) hitFlash = Math.max(0, hitFlash - dt * 1.4);
+      if (player.cymbalTimer > 0) player.cymbalTimer = Math.max(0, player.cymbalTimer - dt);
+
+      const bgFactor = state === 'playing' ? 1 : 0.35;
+
+      for (const c of clouds) {
+        c.x -= c.speed * bgFactor * dt;
+        if (c.x < -160) {
+          c.x = width + 140;
+          c.y = 45 + Math.random() * (height * 0.24);
+        }
+      }
+
+      for (const b of farBuildings) {
+        b.x -= worldSpeed * 0.22 * bgFactor * dt;
+      }
+      if (farBuildings.length && farBuildings[0].x + farBuildings[0].w < -80) {
+        const first = farBuildings.shift();
+        const last = farBuildings[farBuildings.length - 1];
+        first.x = last.x + last.w + 6;
+        first.h = 95 + Math.random() * 125;
+        first.hasSpire = Math.random() < 0.25;
+        farBuildings.push(first);
+      }
+
+      for (const b of midBuildings) {
+        b.x -= worldSpeed * 0.55 * bgFactor * dt;
+      }
+      if (midBuildings.length && midBuildings[0].x + midBuildings[0].w < -120) {
+        const first = midBuildings.shift();
+        const last = midBuildings[midBuildings.length - 1];
+        first.x = last.x + last.w + 14;
+        first.h = 120 + Math.random() * 110;
+        midBuildings.push(first);
+      }
+
+      for (const p of streetProps) {
+        p.x -= worldSpeed * 0.85 * bgFactor * dt;
+        if (p.x < -70) {
+          p.x = width + 80 + Math.random() * 90;
+        }
+      }
+
+      if (state !== 'playing') {
+        player.y = (height - groundHeight) * 0.42 + Math.sin(elapsed * 2.5) * 8;
+        player.propellerPhase += dt * 12;
+        return;
+      }
+
+      worldSpeed = Math.min(390, 215 + score * 0.45);
+      distanceAccumulator += worldSpeed * dt * 0.05;
+      if (distanceAccumulator >= 1) {
+        const addPts = Math.floor(distanceAccumulator);
+        score += addPts;
+        distanceAccumulator -= addPts;
+        scoreVal.textContent = Math.floor(score);
+      }
+
+      const canThrust = holding && player.energy > 0.2;
+      if (canThrust) {
+        player.vy -= 1180 * dt;
+        player.energy = Math.max(0, player.energy - 27 * dt);
+        player.propellerPhase += dt * 42;
+        if (Math.random() < 0.55) {
+          addParticles(player.x, player.y - 36, 1, ['#ffffff', '#ffe066', '#90e0ef'], [25, 75]);
+        }
+      } else {
+        holding = false;
+        player.vy += 690 * dt;
+        player.energy = Math.min(player.maxEnergy, player.energy + 11 * dt);
+        player.propellerPhase += dt * (player.vy < 0 ? 22 : 9);
+      }
+
+      player.vy = Math.max(-360, Math.min(370, player.vy));
+      player.y += player.vy * dt;
+
+      const targetAngle = Math.max(-0.28, Math.min(0.32, player.vy * 0.00075));
+      player.angle += (targetAngle - player.angle) * Math.min(1, dt * 10);
+
+      updateEnergyUI();
+
+      if (player.energy <= 0) {
+        endGame('Энергия пропеллера закончилась! Собирай бананы, чтобы подзаряжаться.');
+        return;
+      }
+
+      const ceilingY = 58;
+      if (player.y - player.radiusY < ceilingY) {
+        player.y = ceilingY + player.radiusY;
+        player.vy = Math.max(0, player.vy);
+      }
+
+      const groundY = height - groundHeight;
+      if (player.y + player.radiusY >= groundY) {
+        player.y = groundY - player.radiusY;
+        endGame('Обезьянка приземлилась слишком жёстко!');
+        return;
+      }
+
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnObstacle();
+        const minGap = Math.max(1.05, 1.78 - score * 0.003);
+        spawnTimer = minGap + Math.random() * 0.55;
+      }
+
+      bananaPatternTimer -= dt;
+      if (bananaPatternTimer <= 0) {
+        spawnBananaArc();
+        bananaPatternTimer = 2.2 + Math.random() * 1.4;
+      }
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.x -= worldSpeed * dt;
+
+        if (obs.kind === 'drone') {
+          obs.phase += dt * 3.4;
+          obs.y = obs.baseY + Math.sin(obs.phase) * 26;
+        } else if (obs.kind === 'chimney') {
+          obs.smokeTimer -= dt;
+          if (obs.smokeTimer <= 0) {
+            obs.smokeTimer = 0.22;
+            const smokeY = obs.fromTop ? obs.y + obs.h : obs.y;
+            particles.push({
+              x: obs.x + obs.w * 0.5,
+              y: smokeY,
+              vx: -worldSpeed * 0.25 + (Math.random() * 20 - 10),
+              vy: obs.fromTop ? 35 : -45,
+              life: 0.75,
+              maxLife: 0.75,
+              size: 6 + Math.random() * 5,
+              color: 'rgba(235, 240, 248, 0.55)'
+            });
+          }
+        }
+
+        let hit = false;
+        if (obs.kind === 'drone') {
+          const dx = player.x - obs.x;
+          const dy = player.y - obs.y;
+          const sumR = obs.r + Math.min(player.radiusX, player.radiusY) * 0.78;
+          hit = (dx * dx + dy * dy) < (sumR * sumR);
+        } else {
+          hit = circleRectCollide(
+            player.x,
+            player.y,
+            Math.min(player.radiusX, player.radiusY) * 0.76,
+            obs.x + 3,
+            obs.y + 3,
+            obs.w - 6,
+            obs.h - 6
+          );
+        }
+
+        if (hit) {
+          addParticles(player.x, player.y, 18, ['#ffd166', '#ef476f', '#ffffff'], [70, 200]);
+          endGame('Столкновение с препятствием!');
+          return;
+        }
+
+        if (obs.x + (obs.w || obs.r * 2) < -80) {
+          obstacles.splice(i, 1);
+        }
+      }
+
+      for (let i = bananas.length - 1; i >= 0; i--) {
+        const b = bananas[i];
+        b.x -= worldSpeed * dt;
+        b.bobPhase += dt * 4.5;
+        const drawY = b.y + Math.sin(b.bobPhase) * 5;
+
+        const dx = player.x - b.x;
+        const dy = player.y - drawY;
+        const pickR = b.r + Math.max(player.radiusX, player.radiusY) * 0.85;
+        if (dx * dx + dy * dy <= pickR * pickR) {
+          player.energy = Math.min(player.maxEnergy, player.energy + 18);
+          score += 5;
+          player.cymbalTimer = 0.35;
+          scoreVal.textContent = Math.floor(score);
+          updateEnergyUI();
+          haptic('success');
+          addParticles(b.x, drawY, 10, ['#ffe066', '#ffb703', '#fff3b0'], [45, 130]);
+          addFloatingText(b.x, drawY - 10, '+18 ⚡ · +5', '#ffe066');
+          bananas.splice(i, 1);
+          continue;
+        }
+
+        if (b.x < -50) {
+          bananas.splice(i, 1);
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y += ft.vy * dt;
+        ft.life -= dt;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+      }
+    }
+
+    function drawBackground() {
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, height - groundHeight);
+      skyGrad.addColorStop(0, '#3a6ea5');
+      skyGrad.addColorStop(0.52, '#7ba7c7');
+      skyGrad.addColorStop(0.85, '#f4b886');
+      skyGrad.addColorStop(1, '#f7d6a1');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      const sunX = width * 0.76;
+      const sunY = Math.max(110, (height - groundHeight) * 0.32);
+      const sunGlow = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 130);
+      sunGlow.addColorStop(0, 'rgba(255, 244, 200, 0.95)');
+      sunGlow.addColorStop(0.35, 'rgba(255, 210, 135, 0.45)');
+      sunGlow.addColorStop(1, 'rgba(255, 210, 135, 0)');
+      ctx.fillStyle = sunGlow;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 130, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff5d6';
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 34, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (const c of clouds) {
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.scale(c.scale, c.scale);
+        ctx.fillStyle = 'rgba(255, 248, 238, 0.78)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.arc(22, -6, 28, 0, Math.PI * 2);
+        ctx.arc(48, 0, 22, 0, Math.PI * 2);
+        ctx.arc(24, 8, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const groundY = height - groundHeight;
+
+      for (const b of farBuildings) {
+        const by = groundY - b.h;
+        ctx.fillStyle = 'rgba(84, 104, 130, 0.52)';
+        ctx.fillRect(b.x, by, b.w, b.h);
+        if (b.hasSpire) {
+          ctx.beginPath();
+          ctx.moveTo(b.x + b.w * 0.5, by - 26);
+          ctx.lineTo(b.x + b.w * 0.5 - 12, by);
+          ctx.lineTo(b.x + b.w * 0.5 + 12, by);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+
+      const wallPalette = ['#9e5642', '#8c4c3c', '#ab624c'];
+      for (const b of midBuildings) {
+        const by = groundY - b.h;
+        ctx.fillStyle = wallPalette[b.tone % wallPalette.length];
+        ctx.fillRect(b.x, by, b.w, b.h);
+
+        ctx.fillStyle = 'rgba(30, 20, 24, 0.25)';
+        ctx.fillRect(b.x, by, b.w, 8);
+
+        const padX = 14;
+        const padY = 18;
+        const cellW = (b.w - padX * 2) / b.cols;
+        const cellH = (b.h - padY * 2) / b.rows;
+
+        for (let r = 0; r < b.rows; r++) {
+          for (let c = 0; c < b.cols; c++) {
+            const wx = b.x + padX + c * cellW + 5;
+            const wy = by + padY + r * cellH + 4;
+            const ww = Math.max(10, cellW - 10);
+            const wh = Math.max(14, cellH - 12);
+            const lit = b.litWindows[r * b.cols + c];
+            ctx.fillStyle = lit ? '#ffe699' : '#39485c';
+            ctx.fillRect(wx, wy, ww, wh);
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(wx, wy, ww, wh);
+          }
+        }
+      }
+
+      for (const p of streetProps) {
+        ctx.save();
+        ctx.translate(p.x, groundY);
+        ctx.scale(p.scale, p.scale);
+        if (p.type === 'lamp') {
+          ctx.fillStyle = '#26303d';
+          ctx.fillRect(-3, -64, 6, 64);
+          ctx.fillStyle = '#ffd166';
+          ctx.beginPath();
+          ctx.arc(0, -68, 7, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = '#5c3d2e';
+          ctx.fillRect(-4, -36, 8, 36);
+          ctx.fillStyle = '#4c8c5a';
+          ctx.beginPath();
+          ctx.arc(0, -48, 22, 0, Math.PI * 2);
+          ctx.arc(-12, -40, 16, 0, Math.PI * 2);
+          ctx.arc(12, -40, 16, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      const roadGrad = ctx.createLinearGradient(0, groundY, 0, height);
+      roadGrad.addColorStop(0, '#495057');
+      roadGrad.addColorStop(0.22, '#343a40');
+      roadGrad.addColorStop(1, '#1e2229');
+      ctx.fillStyle = roadGrad;
+      ctx.fillRect(0, groundY, width, groundHeight);
+
+      ctx.fillStyle = '#adb5bd';
+      ctx.fillRect(0, groundY, width, 4);
+
+      const stripeW = 36;
+      const gapW = 28;
+      const period = stripeW + gapW;
+      const offset = (elapsed * worldSpeed * 0.95) % period;
+      ctx.fillStyle = 'rgba(255, 224, 130, 0.7)';
+      for (let x = -offset; x < width + period; x += period) {
+        ctx.fillRect(x, groundY + groundHeight * 0.52, stripeW, 4);
+      }
+    }
+
+    function drawObstacles() {
+      for (const obs of obstacles) {
+        if (obs.kind === 'chimney') {
+          ctx.fillStyle = '#8d3b2c';
+          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+          ctx.strokeStyle = '#4a1d15';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+
+          const lipH = 10;
+          const lipY = obs.fromTop ? obs.y + obs.h - lipH : obs.y;
+          ctx.fillStyle = '#a84736';
+          ctx.fillRect(obs.x - 4, lipY, obs.w + 8, lipH);
+          ctx.strokeRect(obs.x - 4, lipY, obs.w + 8, lipH);
+        } else if (obs.kind === 'post') {
+          ctx.fillStyle = '#3b4252';
+          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+          ctx.strokeStyle = '#191d24';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+
+          ctx.fillStyle = '#f77f00';
+          ctx.fillRect(obs.x - 3, obs.y, obs.w + 6, 12);
+          ctx.strokeRect(obs.x - 3, obs.y, obs.w + 6, 12);
+        } else if (obs.kind === 'drone') {
+          ctx.save();
+          ctx.translate(obs.x, obs.y);
+          ctx.fillStyle = '#2b2d42';
+          ctx.beginPath();
+          ctx.arc(0, 0, obs.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = '#ef233c';
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffbe0b';
+          ctx.beginPath();
+          ctx.arc(4, 0, 7, 0, Math.PI * 2);
+          ctx.fill();
+
+          const rotorSpan = Math.abs(Math.cos(elapsed * 28)) * 26 + 8;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-rotorSpan, -obs.r - 4);
+          ctx.lineTo(rotorSpan, -obs.r - 4);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
+    function drawBananas() {
+      for (const b of bananas) {
+        const drawY = b.y + Math.sin(b.bobPhase) * 5;
+        ctx.save();
+        ctx.translate(b.x, drawY);
+        ctx.rotate(-0.25);
+
+        ctx.fillStyle = 'rgba(255, 224, 102, 0.25)';
+        ctx.beginPath();
+        ctx.arc(0, 0, b.r + 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffd60a';
+        ctx.strokeStyle = '#7f5500';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(-4, 0, 13, -0.85, 0.85);
+        ctx.arc(2, 0, 10, 0.85, -0.85, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function drawFallbackMonkey() {
+      ctx.fillStyle = '#8b4513';
+      ctx.beginPath();
+      ctx.ellipse(0, 8, 18, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#2b6cb0';
+      ctx.fillRect(-15, 16, 30, 14);
+
+      ctx.fillStyle = '#a0522d';
+      ctx.beginPath();
+      ctx.arc(0, -14, 17, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#f3d5b5';
+      ctx.beginPath();
+      ctx.ellipse(0, -11, 11, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(-5, -16, 4.5, 0, Math.PI * 2);
+      ctx.arc(5, -16, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.arc(-5, -16, 2, 0, Math.PI * 2);
+      ctx.arc(5, -16, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#e63946';
+      ctx.beginPath();
+      ctx.arc(0, -25, 16, Math.PI, 0);
+      ctx.fill();
+    }
+
+    function drawMonkey() {
+      ctx.save();
+      ctx.translate(player.x, player.y);
+      ctx.rotate(player.angle);
+
+      if (player.cymbalTimer > 0) {
+        ctx.strokeStyle = 'rgba(255, 224, 102, 0.75)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 4, 44 + (0.35 - player.cymbalTimer) * 45, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (spriteLoaded && customSprite) {
+        const w = customSprite.width || 1;
+        const h = customSprite.height || 1;
+        const targetH = 88;
+        const scale = targetH / h;
+        const drawW = w * scale;
+        const drawH = h * scale;
+        ctx.drawImage(customSprite, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+
+        // Динамическое размытие лопасти поверх пропеллера при наборе высоты
+        const thrusting = state === 'playing' && holding && player.energy > 0;
+        const blurWidth = thrusting ? 46 + Math.sin(player.propellerPhase) * 10 : 18;
+        ctx.save();
+        ctx.translate(0, -drawH * 0.44);
+        ctx.fillStyle = thrusting
+          ? 'rgba(255, 90, 90, 0.36)'
+          : 'rgba(255, 255, 255, 0.14)';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, blurWidth, thrusting ? 5 : 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        drawFallbackMonkey();
+      }
+
+      ctx.restore();
+    }
+
+    function drawEffects() {
+      for (const p of particles) {
+        const alpha = Math.max(0, p.life / p.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      for (const ft of floatingTexts) {
+        const alpha = Math.max(0, ft.life / ft.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.font = '800 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#111827';
+        ctx.fillText(ft.text, ft.x + 1.5, ft.y + 1.5);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
+
+      if (hitFlash > 0) {
+        ctx.fillStyle = `rgba(239, 68, 68, ${hitFlash * 0.55})`;
+        ctx.fillRect(0, 0, width, height);
+      }
+    }
+
+    function render() {
+      ctx.save();
+      if (screenShake > 0) {
+        const sx = (Math.random() - 0.5) * screenShake;
+        const sy = (Math.random() - 0.5) * screenShake;
+        ctx.translate(sx, sy);
+      }
+
+      drawBackground();
+      drawBananas();
+      drawObstacles();
+      drawMonkey();
+      drawEffects();
+
+      ctx.restore();
+    }
+
+    let lastTime = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt);
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    resize();
+    resetGame();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
