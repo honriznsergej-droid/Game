@@ -3,31 +3,33 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Cymbal Copter — Банановый полёт</title>
+  <title>Monkey Propeller Jetpack</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     * {
       box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
+      margin: 0;
+      padding: 0;
       user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     html, body {
-      margin: 0;
-      padding: 0;
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background: #140b18;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: #1a2234;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       color: #fff;
+      touch-action: none;
     }
 
-    #app {
+    #game-wrapper {
       position: relative;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
-      background: linear-gradient(180deg, #1b1029 0%, #562349 42%, #c85a32 76%, #f4a243 100%);
     }
 
     canvas {
@@ -36,7 +38,6 @@
       height: 100%;
     }
 
-    /* Верхний HUD */
     .hud {
       position: absolute;
       top: 14px;
@@ -50,60 +51,39 @@
       z-index: 10;
     }
 
-    .hud-left, .hud-right {
+    .hud-left {
       display: flex;
       flex-direction: column;
       gap: 8px;
-    }
-
-    .hud-right {
-      align-items: flex-end;
-    }
-
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      border-radius: 999px;
-      background: rgba(20, 11, 24, 0.58);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 226, 170, 0.24);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-      font-weight: 700;
-      font-size: 15px;
-    }
-
-    .banana-badge {
-      color: #ffd84d;
-      font-size: 17px;
+      min-width: 170px;
+      max-width: 240px;
+      width: 45%;
     }
 
     .energy-box {
-      width: 168px;
-      padding: 8px 12px;
-      border-radius: 16px;
-      background: rgba(20, 11, 24, 0.58);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 226, 170, 0.22);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+      background: rgba(15, 22, 36, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 8px 10px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
     }
 
     .energy-label {
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      opacity: 0.88;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
       margin-bottom: 5px;
+      color: #ffe28a;
     }
 
-    .energy-bar {
+    .energy-track {
       width: 100%;
-      height: 8px;
-      border-radius: 999px;
+      height: 10px;
       background: rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
       overflow: hidden;
     }
 
@@ -111,33 +91,38 @@
       height: 100%;
       width: 100%;
       border-radius: 999px;
-      background: linear-gradient(90deg, #ff7b39, #ffd43b, #69db7c);
-      transition: width 0.08s linear;
+      background: linear-gradient(90deg, #ff6b35 0%, #ffb703 55%, #52b788 100%);
+      transition: width 0.06s linear;
     }
 
-    .btn-upload {
-      pointer-events: auto;
-      cursor: pointer;
-      padding: 8px 13px;
-      border-radius: 999px;
-      background: rgba(255, 212, 59, 0.16);
-      border: 1px solid rgba(255, 212, 59, 0.45);
-      color: #ffe066;
-      font-weight: 600;
-      font-size: 12px;
-      transition: transform 0.12s ease, background 0.15s ease;
+    .hud-right {
+      display: flex;
+      gap: 8px;
     }
 
-    .btn-upload:hover {
-      background: rgba(255, 212, 59, 0.28);
-      transform: translateY(-1px);
+    .stat-pill {
+      background: rgba(15, 22, 36, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(8px);
+      border-radius: 12px;
+      padding: 8px 12px;
+      text-align: right;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
     }
 
-    #spriteInput {
-      display: none;
+    .stat-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      opacity: 0.75;
+      letter-spacing: 0.6px;
     }
 
-    /* Оверлеи старта и финала */
+    .stat-value {
+      font-size: 18px;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
     .overlay {
       position: absolute;
       inset: 0;
@@ -145,7 +130,7 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
-      background: rgba(14, 7, 19, 0.46);
+      background: rgba(10, 15, 26, 0.55);
       backdrop-filter: blur(6px);
       z-index: 20;
       transition: opacity 0.2s ease;
@@ -158,817 +143,1108 @@
 
     .card {
       width: 100%;
-      max-width: 390px;
-      padding: 24px 22px;
-      border-radius: 26px;
-      background: linear-gradient(160deg, rgba(36, 18, 44, 0.92), rgba(20, 10, 25, 0.95));
-      border: 1px solid rgba(255, 216, 140, 0.28);
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      max-width: 380px;
+      background: rgba(20, 29, 48, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 22px;
+      padding: 24px 20px;
       text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
     }
 
-    .card h1 {
-      margin: 0 0 8px;
-      font-size: 26px;
-      line-height: 1.15;
-      color: #ffe066;
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #ffd166;
+      background: rgba(255, 209, 102, 0.14);
+      border: 1px solid rgba(255, 209, 102, 0.3);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
     }
 
-    .card p {
-      margin: 0 0 16px;
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    p.desc {
       font-size: 14px;
       line-height: 1.45;
-      color: rgba(255, 246, 232, 0.86);
-    }
-
-    .rules {
-      text-align: left;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 12px 14px;
+      color: rgba(255, 255, 255, 0.82);
       margin-bottom: 18px;
+    }
+
+    .btn-primary {
+      width: 100%;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 16px;
+      font-weight: 800;
+      color: #161b26;
+      background: linear-gradient(135deg, #ffd166 0%, #f77f00 100%);
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(247, 127, 0, 0.35);
+      transition: transform 0.1s ease, filter 0.15s ease;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.97);
+    }
+
+    .btn-secondary {
+      margin-top: 10px;
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 12px;
+      padding: 10px 14px;
       font-size: 13px;
-      line-height: 1.5;
-      color: rgba(255, 248, 238, 0.92);
+      font-weight: 600;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      cursor: pointer;
     }
 
-    .rules div {
-      margin: 4px 0;
+    .sprite-status {
+      margin-top: 8px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.65);
     }
 
-    .stats-grid {
+    .final-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
       margin-bottom: 18px;
     }
 
-    .stat-box {
-      padding: 12px;
-      border-radius: 16px;
+    .final-box {
       background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.09);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 12px;
     }
 
-    .stat-val {
+    .final-box .num {
       font-size: 22px;
       font-weight: 800;
-      color: #ffd43b;
+      color: #ffd166;
     }
 
-    .stat-lbl {
-      font-size: 12px;
-      opacity: 0.78;
+    .final-box .lbl {
+      font-size: 11px;
+      opacity: 0.75;
       margin-top: 2px;
-    }
-
-    .btn-primary {
-      width: 100%;
-      padding: 14px 18px;
-      border: none;
-      border-radius: 16px;
-      background: linear-gradient(135deg, #ffd43b, #ff8c24);
-      color: #1c0e06;
-      font-size: 16px;
-      font-weight: 800;
-      cursor: pointer;
-      box-shadow: 0 10px 26px rgba(255, 140, 36, 0.38);
-      transition: transform 0.12s ease, filter 0.15s ease;
-    }
-
-    .btn-primary:hover {
-      filter: brightness(1.05);
-      transform: translateY(-1px);
-    }
-
-    .btn-primary:active {
-      transform: scale(0.98);
-    }
-
-    .hint-bar {
-      position: absolute;
-      bottom: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 6px 14px;
-      border-radius: 999px;
-      background: rgba(18, 9, 22, 0.48);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      font-size: 12px;
-      color: rgba(255, 245, 224, 0.85);
-      pointer-events: none;
-      z-index: 10;
-      white-space: nowrap;
     }
   </style>
 </head>
 <body>
-  <div id="app">
+  <div id="game-wrapper">
     <canvas id="gameCanvas"></canvas>
 
     <div class="hud">
       <div class="hud-left">
-        <div class="pill">
-          <span class="banana-badge">🍌</span>
-          <span>Бананы: <span id="bananaCount">0</span></span>
-        </div>
         <div class="energy-box">
           <div class="energy-label">
-            <span>Пропеллер</span>
+            <span>⚡ ЭНЕРГИЯ ПРОПЕЛЛЕРА</span>
             <span id="energyText">100%</span>
           </div>
-          <div class="energy-bar">
+          <div class="energy-track">
             <div class="energy-fill" id="energyFill"></div>
           </div>
         </div>
       </div>
 
       <div class="hud-right">
-        <div class="pill">
-          <span>Рекорд: <span id="bestCount">0</span></span>
+        <div class="stat-pill">
+          <div class="stat-title">Очки</div>
+          <div class="stat-value" id="scoreVal">0</div>
         </div>
-        <label class="btn-upload" for="spriteInput" title="Загрузить свой спрайт персонажа">
-          🖼 Свой спрайт
-        </label>
-        <input type="file" id="spriteInput" accept="image/*" />
+        <div class="stat-pill">
+          <div class="stat-title">Рекорд</div>
+          <div class="stat-value" id="bestVal">0</div>
+        </div>
       </div>
     </div>
 
-    <div class="hint-bar">Удерживай экран / ЛКМ / Пробел для подъёма</div>
-
     <div class="overlay" id="startOverlay">
       <div class="card">
-        <h1>Cymbal Copter</h1>
-        <p>Закатный полёт над старым городом. Лови бананы и следи за энергией пропеллера!</p>
-        <div class="rules">
-          <div>🍌 <b>1 банан в полёте = +1 заработанный банан</b> (полёт сам по себе бананы не даёт).</div>
-          <div>🚁 Удержание подъёма тратит энергию пропеллера; отпускание и сбор бананов её восстанавливают.</div>
-          <div>🏙 Избегай башен, труб и провалов к земле.</div>
-        </div>
-        <button class="btn-primary" id="startBtn">Взлететь</button>
+        <div class="badge">Telegram Mini App</div>
+        <h1 id="greetingTitle">Полёт на пропеллере</h1>
+        <p class="desc">
+          <b>Зажми экран</b> (или пробел), чтобы раскрутить пропеллер и набрать высоту.
+          <b>Отпусти</b>, чтобы плавно планировать вниз. Лови бананы 🍌 — они восстанавливают энергию!
+        </p>
+        <button class="btn-primary" id="startBtn">ПОЛЕТЕЛИ!</button>
+        <button class="btn-secondary" id="uploadSpriteBtn">Заменить спрайт вручную (PNG)</button>
+        <div class="sprite-status" id="spriteStatus">Загрузка monkey.png...</div>
+        <input type="file" id="spriteInput" accept="image/*" hidden />
       </div>
     </div>
 
     <div class="overlay hidden" id="gameOverOverlay">
       <div class="card">
-        <h1 id="overTitle">Полёт завершён</h1>
-        <p id="overReason">Попробуй ещё раз и собери больше бананов.</p>
-        <div class="stats-grid">
-          <div class="stat-box">
-            <div class="stat-val" id="finalBananas">0</div>
-            <div class="stat-lbl">Заработано бананов</div>
+        <div class="badge">Полёт завершён</div>
+        <h1>Столкновение!</h1>
+        <p class="desc" id="failReason">Энергия закончилась или ты задел препятствие.</p>
+        <div class="final-stats">
+          <div class="final-box">
+            <div class="num" id="finalScore">0</div>
+            <div class="lbl">ОЧКИ</div>
           </div>
-          <div class="stat-box">
-            <div class="stat-val" id="finalBest">0</div>
-            <div class="stat-lbl">Лучший результат</div>
+          <div class="final-box">
+            <div class="num" id="finalBest">0</div>
+            <div class="lbl">ЛУЧШИЙ СЧЁТ</div>
           </div>
         </div>
-        <button class="btn-primary" id="restartBtn">Играть снова</button>
+        <button class="btn-primary" id="restartBtn">ИГРАТЬ СНОВА</button>
       </div>
     </div>
   </div>
 
   <script>
+    // Имя файла спрайта в корне репозитория рядом с index.html
+    const SPRITE_SRC = 'monkey.png';
+
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (user && user.first_name) {
+        document.getElementById('greetingTitle').textContent = `Вперёд, ${user.first_name}!`;
+      }
+    }
+
+    function haptic(type = 'light') {
+      try {
+        if (tg && tg.HapticFeedback) {
+          if (type === 'error') tg.HapticFeedback.notificationOccurred('error');
+          else if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
+          else tg.HapticFeedback.impactOccurred(type);
+        }
+      } catch (_) {}
+    }
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    const bananaCountEl = document.getElementById('bananaCount');
-    const bestCountEl = document.getElementById('bestCount');
-    const energyTextEl = document.getElementById('energyText');
-    const energyFillEl = document.getElementById('energyFill');
+    const energyFill = document.getElementById('energyFill');
+    const energyText = document.getElementById('energyText');
+    const scoreVal = document.getElementById('scoreVal');
+    const bestVal = document.getElementById('bestVal');
     const startOverlay = document.getElementById('startOverlay');
     const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const failReason = document.getElementById('failReason');
+    const finalScore = document.getElementById('finalScore');
+    const finalBest = document.getElementById('finalBest');
     const startBtn = document.getElementById('startBtn');
     const restartBtn = document.getElementById('restartBtn');
-    const finalBananasEl = document.getElementById('finalBananas');
-    const finalBestEl = document.getElementById('finalBest');
-    const overTitleEl = document.getElementById('overTitle');
-    const overReasonEl = document.getElementById('overReason');
+    const uploadSpriteBtn = document.getElementById('uploadSpriteBtn');
     const spriteInput = document.getElementById('spriteInput');
+    const spriteStatus = document.getElementById('spriteStatus');
 
-    const STORAGE_KEY = 'cymbal_copter_best_bananas_v1';
-    let bestBananas = Number(localStorage.getItem(STORAGE_KEY) || 0);
-    bestCountEl.textContent = bestBananas;
+    let customSprite = null;
+    let spriteLoaded = false;
+
+    // Автоматически убираем тёмный/зелёный фон, если файл не имеет альфа-канала
+    function cleanKeyBackground(img) {
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (!w || !h) return img;
+
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d');
+      octx.drawImage(img, 0, 0, w, h);
+
+      let data;
+      try {
+        data = octx.getImageData(0, 0, w, h);
+      } catch (_) {
+        return img;
+      }
+
+      const px = data.data;
+      let hasTransparent = false;
+      for (let i = 3; i < px.length; i += 4) {
+        if (px[i] < 250) {
+          hasTransparent = true;
+          break;
+        }
+      }
+      if (hasTransparent) return off;
+
+      const corners = [
+        [0, 0],
+        [w - 1, 0],
+        [0, h - 1],
+        [w - 1, h - 1]
+      ];
+      let bgR = 0, bgG = 0, bgB = 0;
+      for (const [cx, cy] of corners) {
+        const idx = (cy * w + cx) * 4;
+        bgR += px[idx];
+        bgG += px[idx + 1];
+        bgB += px[idx + 2];
+      }
+      bgR /= 4; bgG /= 4; bgB /= 4;
+
+      const isBlackBg = bgR < 22 && bgG < 22 && bgB < 22;
+      const isGreenBg = bgG > bgR + 45 && bgG > bgB + 45;
+
+      if (!isBlackBg && !isGreenBg) return off;
+
+      for (let i = 0; i < px.length; i += 4) {
+        const r = px[i], g = px[i + 1], b = px[i + 2];
+        if (isBlackBg) {
+          const maxC = Math.max(r, g, b);
+          if (maxC < 26) px[i + 3] = 0;
+          else if (maxC < 52) px[i + 3] = Math.round(((maxC - 26) / 26) * 255);
+        } else if (isGreenBg) {
+          const greenExcess = g - Math.max(r, b);
+          if (greenExcess > 40) px[i + 3] = 0;
+          else if (greenExcess > 15) px[i + 3] = Math.round((1 - (greenExcess - 15) / 25) * 255);
+        }
+      }
+
+      octx.putImageData(data, 0, 0);
+      return off;
+    }
+
+    function loadSpriteFromUrl(url, labelText) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        customSprite = cleanKeyBackground(img);
+        spriteLoaded = true;
+        spriteStatus.textContent = labelText || `Спрайт загружен: ${url}`;
+      };
+      img.onerror = () => {
+        spriteLoaded = false;
+        customSprite = null;
+        spriteStatus.textContent = `Файл "${url}" не найден — используется запасной рисунок`;
+      };
+      img.src = url + (url.startsWith('blob:') ? '' : `?v=${Date.now()}`);
+    }
+
+    loadSpriteFromUrl(SPRITE_SRC, `Подключён спрайт: ${SPRITE_SRC}`);
+
+    uploadSpriteBtn.addEventListener('click', () => spriteInput.click());
+    spriteInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      loadSpriteFromUrl(url, `Загружен файл: ${file.name}`);
+    });
 
     let width = 0;
     let height = 0;
     let dpr = 1;
+    let groundHeight = 84;
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       width = window.innerWidth;
       height = window.innerHeight;
+      groundHeight = Math.max(72, Math.min(96, height * 0.12));
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      generateCityLayers();
+      initScenery();
     }
 
-    // --- Спрайт персонажа (приоритет: загруженный файл -> monkey.jpg -> monkey.png -> запасная отрисовка) ---
-    let cleanSpriteCanvas = null;
-    let spriteLoaded = false;
-
-    function prepareCleanSprite(img) {
-      const off = document.createElement('canvas');
-      off.width = img.naturalWidth || img.width;
-      off.height = img.naturalHeight || img.height;
-      const octx = off.getContext('2d', { willReadFrequently: true });
-      octx.drawImage(img, 0, 0);
-
-      try {
-        const frame = octx.getImageData(0, 0, off.width, off.height);
-        const data = frame.data;
-        // Удаляем почти чёрный фон (как на monkey.jpg), сохраняя тёмные контуры и глаза
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          if (r < 14 && g < 14 && b < 14) {
-            data[i + 3] = 0;
-          } else if (r < 26 && g < 26 && b < 26) {
-            const lum = Math.max(r, g, b);
-            data[i + 3] = Math.min(255, Math.floor(((lum - 14) / 12) * 255));
-          }
-        }
-        octx.putImageData(frame, 0, 0);
-      } catch (e) {
-        // Если canvas помечен CORS при удалённой загрузке, рисуем img напрямую
-        return img;
-      }
-      return off;
-    }
-
-    function loadSpriteUrl(url, onSuccess) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        cleanSpriteCanvas = prepareCleanSprite(img);
-        spriteLoaded = true;
-        if (onSuccess) onSuccess();
-      };
-      img.onerror = () => {
-        if (onSuccess) onSuccess();
-      };
-      img.src = url;
-    }
-
-    // Пробуем локальные файлы monkey.jpg и monkey.png в той же папке, что и index.html
-    loadSpriteUrl('./monkey.jpg', () => {
-      if (!spriteLoaded) loadSpriteUrl('./monkey.png');
-    });
-
-    spriteInput.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          cleanSpriteCanvas = prepareCleanSprite(img);
-          spriteLoaded = true;
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // --- Закатный европейский город ---
+    let clouds = [];
     let farBuildings = [];
     let midBuildings = [];
-    let clouds = [];
+    let streetProps = [];
 
-    function generateCityLayers() {
+    function initScenery() {
+      clouds = Array.from({ length: 6 }, (_, i) => ({
+        x: (width / 5) * i + Math.random() * 80,
+        y: 55 + Math.random() * (height * 0.24),
+        scale: 0.65 + Math.random() * 0.65,
+        speed: 10 + Math.random() * 14
+      }));
+
       farBuildings = [];
-      midBuildings = [];
-      clouds = [];
-
-      const groundY = height - 64;
-      let x = -40;
-      let idx = 0;
-      while (x < width + 180) {
-        const w = 52 + ((idx * 29) % 44);
-        const h = 95 + ((idx * 47) % 135);
+      let fx = -40;
+      while (fx < width + 220) {
+        const bw = 65 + Math.random() * 75;
+        const bh = 95 + Math.random() * 125;
         farBuildings.push({
-          x,
-          w,
-          h,
-          y: groundY - h,
-          hasSpire: idx % 4 === 0,
-          hasArch: idx % 3 === 1
+          x: fx,
+          w: bw,
+          h: bh,
+          hasSpire: Math.random() < 0.25,
+          hueShift: Math.random() * 12 - 6
         });
-        x += w - 4;
-        idx++;
+        fx += bw + 6;
       }
 
-      x = -60;
-      idx = 0;
-      while (x < width + 220) {
-        const w = 68 + ((idx * 37) % 52);
-        const h = 70 + ((idx * 53) % 105);
-        const cols = Math.max(2, Math.floor((w - 18) / 16));
-        const rows = Math.max(2, Math.floor((h - 24) / 20));
-        const windows = [];
+      midBuildings = [];
+      let mx = -60;
+      while (mx < width + 260) {
+        const bw = 105 + Math.random() * 75;
+        const bh = 120 + Math.random() * 110;
+        const cols = Math.max(2, Math.floor((bw - 24) / 28));
+        const rows = Math.max(2, Math.floor((bh - 36) / 34));
+        const litWindows = [];
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
-            const lit = ((idx * 13 + r * 7 + c * 5) % 4) !== 0;
-            windows.push({
-              rx: 10 + c * 16,
-              ry: 14 + r * 20,
-              lit
-            });
+            litWindows.push(Math.random() < 0.36);
           }
         }
         midBuildings.push({
-          x,
-          w,
-          h,
-          y: groundY - h,
-          roofType: idx % 3,
-          windows
+          x: mx,
+          w: bw,
+          h: bh,
+          cols,
+          rows,
+          litWindows,
+          tone: Math.floor(Math.random() * 3)
         });
-        x += w + 8;
-        idx++;
+        mx += bw + 14;
       }
 
-      for (let i = 0; i < 6; i++) {
-        clouds.push({
-          x: (width / 5) * i + (i * 35) % 90,
-          y: 48 + (i % 3) * 36,
-          scale: 0.75 + (i % 3) * 0.25,
-          speed: 10 + (i % 3) * 5
+      streetProps = [];
+      let sx = 40;
+      while (sx < width + 240) {
+        streetProps.push({
+          x: sx,
+          type: Math.random() < 0.55 ? 'lamp' : 'tree',
+          scale: 0.85 + Math.random() * 0.3
         });
+        sx += 135 + Math.random() * 90;
       }
     }
 
-    // --- Игровое состояние ---
-    const state = {
-      mode: 'start', // 'start' | 'playing' | 'gameover'
-      bananas: 0,
-      thrusting: false,
-      propellerAngle: 0,
-      time: 0,
-      shake: 0,
-      player: {
-        x: 120,
-        y: 240,
-        vy: 0,
-        radius: 26,
-        energy: 100,
-        tilt: 0
-      },
-      obstacles: [],
-      pickups: [],
-      particles: [],
-      popups: [],
-      spawnTimer: 0,
-      bananaTimer: 0
+    window.addEventListener('resize', resize);
+
+    let bestScore = Number(localStorage.getItem('monkey_jetpack_best') || 0);
+    bestVal.textContent = bestScore;
+
+    let state = 'menu';
+    let holding = false;
+    let score = 0;
+    let distanceAccumulator = 0;
+    let worldSpeed = 210;
+    let screenShake = 0;
+    let hitFlash = 0;
+    let elapsed = 0;
+
+    const player = {
+      x: 110,
+      y: 220,
+      vy: 0,
+      radiusX: 28,
+      radiusY: 38,
+      angle: 0,
+      energy: 100,
+      maxEnergy: 100,
+      propellerPhase: 0,
+      cymbalTimer: 0
     };
 
+    let obstacles = [];
+    let bananas = [];
+    let particles = [];
+    let floatingTexts = [];
+    let spawnTimer = 0;
+    let bananaPatternTimer = 0;
+
     function resetGame() {
-      const groundY = height - 64;
-      state.bananas = 0;
-      state.thrusting = false;
-      state.shake = 0;
-      state.obstacles = [];
-      state.pickups = [];
-      state.particles = [];
-      state.popups = [];
-      state.spawnTimer = 0.7;
-      state.bananaTimer = 0.45;
+      player.x = Math.min(150, Math.max(85, width * 0.24));
+      player.y = Math.max(130, (height - groundHeight) * 0.42);
+      player.vy = 0;
+      player.angle = 0;
+      player.energy = 100;
+      player.propellerPhase = 0;
+      player.cymbalTimer = 0;
 
-      state.player.x = Math.min(150, Math.max(84, width * 0.22));
-      state.player.y = Math.min(groundY - 120, Math.max(120, height * 0.42));
-      state.player.vy = 0;
-      state.player.energy = 100;
-      state.player.tilt = 0;
+      obstacles = [];
+      bananas = [];
+      particles = [];
+      floatingTexts = [];
+      score = 0;
+      distanceAccumulator = 0;
+      worldSpeed = 215;
+      screenShake = 0;
+      hitFlash = 0;
+      spawnTimer = 1.1;
+      bananaPatternTimer = 0.6;
 
-      bananaCountEl.textContent = '0';
+      scoreVal.textContent = '0';
       updateEnergyUI();
-    }
-
-    function updateEnergyUI() {
-      const pct = Math.max(0, Math.min(100, Math.round(state.player.energy)));
-      energyTextEl.textContent = `${pct}%`;
-      energyFillEl.style.width = `${pct}%`;
     }
 
     function startGame() {
       resetGame();
-      state.mode = 'playing';
+      state = 'playing';
       startOverlay.classList.add('hidden');
       gameOverOverlay.classList.add('hidden');
+      haptic('medium');
     }
 
     function endGame(reason) {
-      if (state.mode === 'gameover') return;
-      state.mode = 'gameover';
-      state.thrusting = false;
-      state.shake = 10;
+      if (state === 'gameover') return;
+      state = 'gameover';
+      holding = false;
+      screenShake = 14;
+      hitFlash = 0.45;
+      haptic('error');
 
-      if (state.bananas > bestBananas) {
-        bestBananas = state.bananas;
-        localStorage.setItem(STORAGE_KEY, String(bestBananas));
+      const finalInt = Math.floor(score);
+      if (finalInt > bestScore) {
+        bestScore = finalInt;
+        localStorage.setItem('monkey_jetpack_best', String(bestScore));
       }
 
-      bestCountEl.textContent = String(bestBananas);
-      finalBananasEl.textContent = String(state.bananas);
-      finalBestEl.textContent = String(bestBananas);
-      overTitleEl.textContent = 'Полёт завершён';
-      overReasonEl.textContent = reason;
+      failReason.textContent = reason;
+      finalScore.textContent = finalInt;
+      finalBest.textContent = bestScore;
+      bestVal.textContent = bestScore;
       gameOverOverlay.classList.remove('hidden');
     }
 
-    // --- Управление ---
-    function setThrust(active) {
-      if (state.mode !== 'playing') return;
-      state.thrusting = active;
+    function updateEnergyUI() {
+      const pct = Math.max(0, Math.min(100, Math.round((player.energy / player.maxEnergy) * 100)));
+      energyFill.style.width = `${pct}%`;
+      energyText.textContent = `${pct}%`;
+    }
+
+    function setHolding(active) {
+      if (state !== 'playing') {
+        holding = false;
+        return;
+      }
+      if (active && !holding && player.energy > 1) {
+        haptic('light');
+      }
+      holding = active;
     }
 
     window.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('button') || e.target.closest('label')) return;
-      if (state.mode === 'playing') setThrust(true);
+      if (e.target.closest('button') || e.target.closest('.overlay')) return;
+      setHolding(true);
     });
-
-    window.addEventListener('pointerup', () => setThrust(false));
-    window.addEventListener('pointercancel', () => setThrust(false));
-    window.addEventListener('blur', () => setThrust(false));
+    window.addEventListener('pointerup', () => setHolding(false));
+    window.addEventListener('pointercancel', () => setHolding(false));
 
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
-        if (state.mode === 'playing') {
+        if (state === 'playing') {
           e.preventDefault();
-          setThrust(true);
+          setHolding(true);
         }
       }
     });
-
     window.addEventListener('keyup', (e) => {
       if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
-        setThrust(false);
+        setHolding(false);
       }
     });
 
     startBtn.addEventListener('click', startGame);
     restartBtn.addEventListener('click', startGame);
 
-    // --- Спавн препятствий и настоящих бананов ---
     function spawnObstacle() {
-      const groundY = height - 64;
-      const minTop = 58;
-      const maxBottom = groundY - 24;
-      const playableHeight = Math.max(220, maxBottom - minTop);
+      const playableTop = 74;
+      const playableBottom = height - groundHeight - 18;
+      const playableH = Math.max(160, playableBottom - playableTop);
 
-      // Выбираем стиль: пара башня сверху + труба снизу, либо одиночная башня/колонна
       const typeRoll = Math.random();
-      const speed = Math.min(295, 195 + state.bananas * 2.2);
-
-      if (typeRoll < 0.52) {
-        const gap = Math.max(142, Math.min(188, playableHeight * 0.34));
-        const maxUpperH = Math.max(60, playableHeight - gap - 65);
-        const upperH = 45 + Math.random() * maxUpperH;
-        const lowerY = minTop + upperH + gap;
-        const lowerH = Math.max(45, maxBottom - lowerY);
-
-        state.obstacles.push({
-          kind: 'pair',
+      if (typeRoll < 0.42) {
+        const w = 44;
+        const h = Math.min(150, Math.max(68, playableH * (0.18 + Math.random() * 0.16)));
+        const fromTop = Math.random() < 0.5;
+        obstacles.push({
+          kind: 'chimney',
           x: width + 40,
-          w: 54,
-          upperTop: 0,
-          upperBottom: minTop + upperH,
-          lowerTop: lowerY,
-          lowerBottom: groundY,
-          lowerH,
-          speed,
-          scored: false
+          y: fromTop ? playableTop : playableBottom - h,
+          w,
+          h,
+          fromTop,
+          smokeTimer: 0
+        });
+      } else if (typeRoll < 0.76) {
+        const w = 30;
+        const h = Math.min(125, Math.max(62, playableH * (0.15 + Math.random() * 0.14)));
+        obstacles.push({
+          kind: 'post',
+          x: width + 40,
+          y: playableBottom - h,
+          w,
+          h
         });
       } else {
-        const fromBottom = Math.random() < 0.65;
-        const h = 75 + Math.random() * Math.min(130, playableHeight * 0.32);
-        state.obstacles.push({
-          kind: fromBottom ? 'pillar_bottom' : 'pillar_top',
+        const r = 22;
+        const cy = playableTop + 36 + Math.random() * Math.max(60, playableH - 72);
+        obstacles.push({
+          kind: 'drone',
           x: width + 40,
-          w: 48,
-          top: fromBottom ? groundY - h : 0,
-          bottom: fromBottom ? groundY : minTop + h,
-          h,
-          speed,
-          scored: false
+          y: cy,
+          baseY: cy,
+          r,
+          phase: Math.random() * Math.PI * 2
         });
       }
     }
 
-    function spawnBanana() {
-      const groundY = height - 64;
-      const minY = 92;
-      const maxY = groundY - 82;
-      if (maxY <= minY) return;
+    function spawnBananaArc() {
+      const playableTop = 84;
+      const playableBottom = height - groundHeight - 36;
+      const midY = playableTop + Math.random() * Math.max(60, playableBottom - playableTop);
+      const count = 4;
+      const spacing = 42;
+      const startX = width + 50;
 
-      const baseY = minY + Math.random() * (maxY - minY);
-      state.pickups.push({
-        x: width + 36,
-        y: baseY,
-        baseY,
-        phase: Math.random() * Math.PI * 2,
-        rot: (Math.random() - 0.5) * 0.45,
-        spin: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random() * 1.1),
-        scale: 1.05,
-        speed: Math.min(295, 195 + state.bananas * 2.2)
-      });
+      for (let i = 0; i < count; i++) {
+        const norm = (i / (count - 1)) * 2 - 1;
+        const arcOffset = (1 - norm * norm) * -36;
+        const by = Math.max(playableTop, Math.min(playableBottom, midY + arcOffset));
+        bananas.push({
+          x: startX + i * spacing,
+          y: by,
+          r: 16,
+          bobPhase: i * 0.6,
+          collected: false
+        });
+      }
     }
 
-    function addBananaBurst(x, y) {
-      for (let i = 0; i < 12; i++) {
-        const ang = (Math.PI * 2 * i) / 12 + Math.random() * 0.3;
-        const spd = 55 + Math.random() * 115;
-        state.particles.push({
+    function addParticles(x, y, count, colors, speedRange = [40, 140]) {
+      for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = speedRange[0] + Math.random() * (speedRange[1] - speedRange[0]);
+        particles.push({
           x,
           y,
           vx: Math.cos(ang) * spd,
           vy: Math.sin(ang) * spd - 20,
-          life: 0.45 + Math.random() * 0.2,
-          maxLife: 0.65,
-          size: 3 + Math.random() * 3.5,
-          color: i % 2 === 0 ? '#ffd43b' : '#fff3bf'
+          life: 0.35 + Math.random() * 0.35,
+          maxLife: 0.7,
+          size: 3 + Math.random() * 4,
+          color: colors[Math.floor(Math.random() * colors.length)]
         });
       }
-      state.popups.push({
+    }
+
+    function addFloatingText(x, y, text, color = '#ffe066') {
+      floatingTexts.push({
         x,
-        y: y - 10,
-        vy: -55,
-        life: 0.75,
-        text: '+1 🍌'
+        y,
+        vy: -48,
+        text,
+        color,
+        life: 0.85,
+        maxLife: 0.85
       });
     }
 
-    // --- Отрисовка сцены ---
-    function drawSunsetSky() {
-      // Солнце у горизонта
-      const sunX = width * 0.74;
-      const sunY = height - 135;
-      const sunR = Math.min(width, height) * 0.085;
+    function circleRectCollide(cx, cy, cr, rx, ry, rw, rh) {
+      const closestX = Math.max(rx, Math.min(cx, rx + rw));
+      const closestY = Math.max(ry, Math.min(cy, ry + rh));
+      const dx = cx - closestX;
+      const dy = cy - closestY;
+      return (dx * dx + dy * dy) < (cr * cr);
+    }
 
-      const glow = ctx.createRadialGradient(sunX, sunY, sunR * 0.2, sunX, sunY, sunR * 3.6);
-      glow.addColorStop(0, 'rgba(255, 243, 176, 0.95)');
-      glow.addColorStop(0.35, 'rgba(255, 184, 77, 0.42)');
-      glow.addColorStop(1, 'rgba(255, 110, 50, 0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, sunR * 3.6, 0, Math.PI * 2);
-      ctx.fill();
+    function update(dt) {
+      elapsed += dt;
 
-      ctx.fillStyle = '#fff0b3';
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
-      ctx.fill();
+      if (screenShake > 0) screenShake = Math.max(0, screenShake - dt * 36);
+      if (hitFlash > 0) hitFlash = Math.max(0, hitFlash - dt * 1.4);
+      if (player.cymbalTimer > 0) player.cymbalTimer = Math.max(0, player.cymbalTimer - dt);
 
-      // Облака в закатном свете
-      for (const cl of clouds) {
-        ctx.save();
-        ctx.translate(cl.x, cl.y);
-        ctx.scale(cl.scale, cl.scale);
-        ctx.fillStyle = 'rgba(255, 186, 128, 0.26)';
-        ctx.beginPath();
-        ctx.arc(0, 0, 22, 0, Math.PI * 2);
-        ctx.arc(20, -5, 26, 0, Math.PI * 2);
-        ctx.arc(44, 0, 21, 0, Math.PI * 2);
-        ctx.arc(22, 8, 22, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+      const bgFactor = state === 'playing' ? 1 : 0.35;
+
+      for (const c of clouds) {
+        c.x -= c.speed * bgFactor * dt;
+        if (c.x < -160) {
+          c.x = width + 140;
+          c.y = 45 + Math.random() * (height * 0.24);
+        }
+      }
+
+      for (const b of farBuildings) {
+        b.x -= worldSpeed * 0.22 * bgFactor * dt;
+      }
+      if (farBuildings.length && farBuildings[0].x + farBuildings[0].w < -80) {
+        const first = farBuildings.shift();
+        const last = farBuildings[farBuildings.length - 1];
+        first.x = last.x + last.w + 6;
+        first.h = 95 + Math.random() * 125;
+        first.hasSpire = Math.random() < 0.25;
+        farBuildings.push(first);
+      }
+
+      for (const b of midBuildings) {
+        b.x -= worldSpeed * 0.55 * bgFactor * dt;
+      }
+      if (midBuildings.length && midBuildings[0].x + midBuildings[0].w < -120) {
+        const first = midBuildings.shift();
+        const last = midBuildings[midBuildings.length - 1];
+        first.x = last.x + last.w + 14;
+        first.h = 120 + Math.random() * 110;
+        midBuildings.push(first);
+      }
+
+      for (const p of streetProps) {
+        p.x -= worldSpeed * 0.85 * bgFactor * dt;
+        if (p.x < -70) {
+          p.x = width + 80 + Math.random() * 90;
+        }
+      }
+
+      if (state !== 'playing') {
+        player.y = (height - groundHeight) * 0.42 + Math.sin(elapsed * 2.5) * 8;
+        player.propellerPhase += dt * 12;
+        return;
+      }
+
+      worldSpeed = Math.min(390, 215 + score * 0.45);
+      distanceAccumulator += worldSpeed * dt * 0.05;
+      if (distanceAccumulator >= 1) {
+        const addPts = Math.floor(distanceAccumulator);
+        score += addPts;
+        distanceAccumulator -= addPts;
+        scoreVal.textContent = Math.floor(score);
+      }
+
+      const canThrust = holding && player.energy > 0.2;
+      if (canThrust) {
+        player.vy -= 1180 * dt;
+        player.energy = Math.max(0, player.energy - 27 * dt);
+        player.propellerPhase += dt * 42;
+        if (Math.random() < 0.55) {
+          addParticles(player.x, player.y - 36, 1, ['#ffffff', '#ffe066', '#90e0ef'], [25, 75]);
+        }
+      } else {
+        holding = false;
+        player.vy += 690 * dt;
+        player.energy = Math.min(player.maxEnergy, player.energy + 11 * dt);
+        player.propellerPhase += dt * (player.vy < 0 ? 22 : 9);
+      }
+
+      player.vy = Math.max(-360, Math.min(370, player.vy));
+      player.y += player.vy * dt;
+
+      const targetAngle = Math.max(-0.28, Math.min(0.32, player.vy * 0.00075));
+      player.angle += (targetAngle - player.angle) * Math.min(1, dt * 10);
+
+      updateEnergyUI();
+
+      if (player.energy <= 0) {
+        endGame('Энергия пропеллера закончилась! Собирай бананы, чтобы подзаряжаться.');
+        return;
+      }
+
+      const ceilingY = 58;
+      if (player.y - player.radiusY < ceilingY) {
+        player.y = ceilingY + player.radiusY;
+        player.vy = Math.max(0, player.vy);
+      }
+
+      const groundY = height - groundHeight;
+      if (player.y + player.radiusY >= groundY) {
+        player.y = groundY - player.radiusY;
+        endGame('Обезьянка приземлилась слишком жёстко!');
+        return;
+      }
+
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnObstacle();
+        const minGap = Math.max(1.05, 1.78 - score * 0.003);
+        spawnTimer = minGap + Math.random() * 0.55;
+      }
+
+      bananaPatternTimer -= dt;
+      if (bananaPatternTimer <= 0) {
+        spawnBananaArc();
+        bananaPatternTimer = 2.2 + Math.random() * 1.4;
+      }
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.x -= worldSpeed * dt;
+
+        if (obs.kind === 'drone') {
+          obs.phase += dt * 3.4;
+          obs.y = obs.baseY + Math.sin(obs.phase) * 26;
+        } else if (obs.kind === 'chimney') {
+          obs.smokeTimer -= dt;
+          if (obs.smokeTimer <= 0) {
+            obs.smokeTimer = 0.22;
+            const smokeY = obs.fromTop ? obs.y + obs.h : obs.y;
+            particles.push({
+              x: obs.x + obs.w * 0.5,
+              y: smokeY,
+              vx: -worldSpeed * 0.25 + (Math.random() * 20 - 10),
+              vy: obs.fromTop ? 35 : -45,
+              life: 0.75,
+              maxLife: 0.75,
+              size: 6 + Math.random() * 5,
+              color: 'rgba(235, 240, 248, 0.55)'
+            });
+          }
+        }
+
+        let hit = false;
+        if (obs.kind === 'drone') {
+          const dx = player.x - obs.x;
+          const dy = player.y - obs.y;
+          const sumR = obs.r + Math.min(player.radiusX, player.radiusY) * 0.78;
+          hit = (dx * dx + dy * dy) < (sumR * sumR);
+        } else {
+          hit = circleRectCollide(
+            player.x,
+            player.y,
+            Math.min(player.radiusX, player.radiusY) * 0.76,
+            obs.x + 3,
+            obs.y + 3,
+            obs.w - 6,
+            obs.h - 6
+          );
+        }
+
+        if (hit) {
+          addParticles(player.x, player.y, 18, ['#ffd166', '#ef476f', '#ffffff'], [70, 200]);
+          endGame('Столкновение с препятствием!');
+          return;
+        }
+
+        if (obs.x + (obs.w || obs.r * 2) < -80) {
+          obstacles.splice(i, 1);
+        }
+      }
+
+      for (let i = bananas.length - 1; i >= 0; i--) {
+        const b = bananas[i];
+        b.x -= worldSpeed * dt;
+        b.bobPhase += dt * 4.5;
+        const drawY = b.y + Math.sin(b.bobPhase) * 5;
+
+        const dx = player.x - b.x;
+        const dy = player.y - drawY;
+        const pickR = b.r + Math.max(player.radiusX, player.radiusY) * 0.85;
+        if (dx * dx + dy * dy <= pickR * pickR) {
+          player.energy = Math.min(player.maxEnergy, player.energy + 18);
+          score += 5;
+          player.cymbalTimer = 0.35;
+          scoreVal.textContent = Math.floor(score);
+          updateEnergyUI();
+          haptic('success');
+          addParticles(b.x, drawY, 10, ['#ffe066', '#ffb703', '#fff3b0'], [45, 130]);
+          addFloatingText(b.x, drawY - 10, '+18 ⚡ · +5', '#ffe066');
+          bananas.splice(i, 1);
+          continue;
+        }
+
+        if (b.x < -50) {
+          bananas.splice(i, 1);
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y += ft.vy * dt;
+        ft.life -= dt;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
       }
     }
 
-    function drawCity() {
-      const groundY = height - 64;
+    function drawBackground() {
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, height - groundHeight);
+      skyGrad.addColorStop(0, '#3a6ea5');
+      skyGrad.addColorStop(0.52, '#7ba7c7');
+      skyGrad.addColorStop(0.85, '#f4b886');
+      skyGrad.addColorStop(1, '#f7d6a1');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, width, height);
 
-      // Дальний силуэт европейского города
+      const sunX = width * 0.76;
+      const sunY = Math.max(110, (height - groundHeight) * 0.32);
+      const sunGlow = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 130);
+      sunGlow.addColorStop(0, 'rgba(255, 244, 200, 0.95)');
+      sunGlow.addColorStop(0.35, 'rgba(255, 210, 135, 0.45)');
+      sunGlow.addColorStop(1, 'rgba(255, 210, 135, 0)');
+      ctx.fillStyle = sunGlow;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 130, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff5d6';
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 34, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (const c of clouds) {
+        ctx.save();
+        ctx.translate(c.x, c.y);
+        ctx.scale(c.scale, c.scale);
+        ctx.fillStyle = 'rgba(255, 248, 238, 0.78)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.arc(22, -6, 28, 0, Math.PI * 2);
+        ctx.arc(48, 0, 22, 0, Math.PI * 2);
+        ctx.arc(24, 8, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const groundY = height - groundHeight;
+
       for (const b of farBuildings) {
-        ctx.fillStyle = 'rgba(54, 24, 52, 0.65)';
-        ctx.fillRect(b.x, b.y, b.w, b.h);
+        const by = groundY - b.h;
+        ctx.fillStyle = 'rgba(84, 104, 130, 0.52)';
+        ctx.fillRect(b.x, by, b.w, b.h);
         if (b.hasSpire) {
           ctx.beginPath();
-          ctx.moveTo(b.x + b.w * 0.5, b.y - 26);
-          ctx.lineTo(b.x + b.w * 0.15, b.y);
-          ctx.lineTo(b.x + b.w * 0.85, b.y);
+          ctx.moveTo(b.x + b.w * 0.5, by - 26);
+          ctx.lineTo(b.x + b.w * 0.5 - 12, by);
+          ctx.lineTo(b.x + b.w * 0.5 + 12, by);
           ctx.closePath();
           ctx.fill();
         }
       }
 
-      // Средний план домов с тёплыми окнами
+      const wallPalette = ['#9e5642', '#8c4c3c', '#ab624c'];
       for (const b of midBuildings) {
-        ctx.fillStyle = '#24122b';
-        ctx.fillRect(b.x, b.y, b.w, b.h);
+        const by = groundY - b.h;
+        ctx.fillStyle = wallPalette[b.tone % wallPalette.length];
+        ctx.fillRect(b.x, by, b.w, b.h);
 
-        // Красная/терракотовая крыша в закате
-        ctx.fillStyle = '#7c2d29';
-        ctx.beginPath();
-        ctx.moveTo(b.x - 4, b.y);
-        ctx.lineTo(b.x + b.w * 0.5, b.y - 16);
-        ctx.lineTo(b.x + b.w + 4, b.y);
-        ctx.closePath();
-        ctx.fill();
+        ctx.fillStyle = 'rgba(30, 20, 24, 0.25)';
+        ctx.fillRect(b.x, by, b.w, 8);
 
-        for (const win of b.windows) {
-          ctx.fillStyle = win.lit ? 'rgba(255, 206, 107, 0.72)' : 'rgba(12, 6, 16, 0.65)';
-          ctx.fillRect(b.x + win.rx, b.y + win.ry, 8, 11);
+        const padX = 14;
+        const padY = 18;
+        const cellW = (b.w - padX * 2) / b.cols;
+        const cellH = (b.h - padY * 2) / b.rows;
+
+        for (let r = 0; r < b.rows; r++) {
+          for (let c = 0; c < b.cols; c++) {
+            const wx = b.x + padX + c * cellW + 5;
+            const wy = by + padY + r * cellH + 4;
+            const ww = Math.max(10, cellW - 10);
+            const wh = Math.max(14, cellH - 12);
+            const lit = b.litWindows[r * b.cols + c];
+            ctx.fillStyle = lit ? '#ffe699' : '#39485c';
+            ctx.fillRect(wx, wy, ww, wh);
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(wx, wy, ww, wh);
+          }
         }
       }
 
-      // Набережная / земля
-      const groundGrad = ctx.createLinearGradient(0, groundY, 0, height);
-      groundGrad.addColorStop(0, '#2b1628');
-      groundGrad.addColorStop(1, '#120812');
-      ctx.fillStyle = groundGrad;
-      ctx.fillRect(0, groundY, width, height - groundY);
+      for (const p of streetProps) {
+        ctx.save();
+        ctx.translate(p.x, groundY);
+        ctx.scale(p.scale, p.scale);
+        if (p.type === 'lamp') {
+          ctx.fillStyle = '#26303d';
+          ctx.fillRect(-3, -64, 6, 64);
+          ctx.fillStyle = '#ffd166';
+          ctx.beginPath();
+          ctx.arc(0, -68, 7, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = '#5c3d2e';
+          ctx.fillRect(-4, -36, 8, 36);
+          ctx.fillStyle = '#4c8c5a';
+          ctx.beginPath();
+          ctx.arc(0, -48, 22, 0, Math.PI * 2);
+          ctx.arc(-12, -40, 16, 0, Math.PI * 2);
+          ctx.arc(12, -40, 16, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
 
-      ctx.fillStyle = '#ff9e44';
-      ctx.fillRect(0, groundY, width, 3);
-    }
+      const roadGrad = ctx.createLinearGradient(0, groundY, 0, height);
+      roadGrad.addColorStop(0, '#495057');
+      roadGrad.addColorStop(0.22, '#343a40');
+      roadGrad.addColorStop(1, '#1e2229');
+      ctx.fillStyle = roadGrad;
+      ctx.fillRect(0, groundY, width, groundHeight);
 
-    function drawObstacleBlock(x, top, w, bottom, isTop) {
-      const h = bottom - top;
-      if (h <= 0) return;
+      ctx.fillStyle = '#adb5bd';
+      ctx.fillRect(0, groundY, width, 4);
 
-      const grad = ctx.createLinearGradient(x, 0, x + w, 0);
-      grad.addColorStop(0, '#3a1c38');
-      grad.addColorStop(0.55, '#592842');
-      grad.addColorStop(1, '#291228');
-      ctx.fillStyle = grad;
-      ctx.fillRect(x, top, w, h);
-
-      ctx.strokeStyle = 'rgba(255, 198, 120, 0.35)';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(x + 0.75, top + 0.75, Math.max(0, w - 1.5), Math.max(0, h - 1.5));
-
-      // Карниз / наконечник башни
-      const capH = 14;
-      const capY = isTop ? bottom - capH : top;
-      ctx.fillStyle = '#8f372e';
-      ctx.fillRect(x - 4, capY, w + 8, capH);
-      ctx.strokeStyle = 'rgba(255, 218, 150, 0.45)';
-      ctx.strokeRect(x - 3.25, capY + 0.75, w + 6.5, capH - 1.5);
+      const stripeW = 36;
+      const gapW = 28;
+      const period = stripeW + gapW;
+      const offset = (elapsed * worldSpeed * 0.95) % period;
+      ctx.fillStyle = 'rgba(255, 224, 130, 0.7)';
+      for (let x = -offset; x < width + period; x += period) {
+        ctx.fillRect(x, groundY + groundHeight * 0.52, stripeW, 4);
+      }
     }
 
     function drawObstacles() {
-      for (const ob of state.obstacles) {
-        if (ob.kind === 'pair') {
-          drawObstacleBlock(ob.x, ob.upperTop, ob.w, ob.upperBottom, true);
-          drawObstacleBlock(ob.x, ob.lowerTop, ob.w, ob.lowerBottom, false);
-        } else if (ob.kind === 'pillar_top') {
-          drawObstacleBlock(ob.x, ob.top, ob.w, ob.bottom, true);
-        } else {
-          drawObstacleBlock(ob.x, ob.top, ob.w, ob.bottom, false);
+      for (const obs of obstacles) {
+        if (obs.kind === 'chimney') {
+          ctx.fillStyle = '#8d3b2c';
+          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+          ctx.strokeStyle = '#4a1d15';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+
+          const lipH = 10;
+          const lipY = obs.fromTop ? obs.y + obs.h - lipH : obs.y;
+          ctx.fillStyle = '#a84736';
+          ctx.fillRect(obs.x - 4, lipY, obs.w + 8, lipH);
+          ctx.strokeRect(obs.x - 4, lipY, obs.w + 8, lipH);
+        } else if (obs.kind === 'post') {
+          ctx.fillStyle = '#3b4252';
+          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+          ctx.strokeStyle = '#191d24';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+
+          ctx.fillStyle = '#f77f00';
+          ctx.fillRect(obs.x - 3, obs.y, obs.w + 6, 12);
+          ctx.strokeRect(obs.x - 3, obs.y, obs.w + 6, 12);
+        } else if (obs.kind === 'drone') {
+          ctx.save();
+          ctx.translate(obs.x, obs.y);
+          ctx.fillStyle = '#2b2d42';
+          ctx.beginPath();
+          ctx.arc(0, 0, obs.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = '#ef233c';
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffbe0b';
+          ctx.beginPath();
+          ctx.arc(4, 0, 7, 0, Math.PI * 2);
+          ctx.fill();
+
+          const rotorSpan = Math.abs(Math.cos(elapsed * 28)) * 26 + 8;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(-rotorSpan, -obs.r - 4);
+          ctx.lineTo(rotorSpan, -obs.r - 4);
+          ctx.stroke();
+          ctx.restore();
         }
       }
     }
 
-    // --- Отрисовка настоящего изогнутого банана ---
-    function drawBanana(p) {
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rot);
-      ctx.scale(p.scale, p.scale);
+    function drawBananas() {
+      for (const b of bananas) {
+        const drawY = b.y + Math.sin(b.bobPhase) * 5;
+        ctx.save();
+        ctx.translate(b.x, drawY);
+        ctx.rotate(-0.25);
 
-      // Мягкое свечение вокруг банана
-      const aura = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
-      aura.addColorStop(0, 'rgba(255, 224, 71, 0.34)');
-      aura.addColorStop(1, 'rgba(255, 224, 71, 0)');
-      ctx.fillStyle = aura;
-      ctx.beginPath();
-      ctx.arc(0, 0, 22, 0, Math.PI * 2);
-      ctx.fill();
+        ctx.fillStyle = 'rgba(255, 224, 102, 0.25)';
+        ctx.beginPath();
+        ctx.arc(0, 0, b.r + 5, 0, Math.PI * 2);
+        ctx.fill();
 
-      // Тело изогнутого банана (внешняя дуга и внутренняя дуга)
-      const grad = ctx.createLinearGradient(-14, -12, 14, 12);
-      grad.addColorStop(0, '#ffe866');
-      grad.addColorStop(0.55, '#ffd014');
-      grad.addColorStop(1, '#e69d00');
-
-      ctx.fillStyle = grad;
-      ctx.strokeStyle = '#4a2605';
-      ctx.lineWidth = 2;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-
-      ctx.beginPath();
-      // Верхняя/внешняя выпуклая дуга
-      ctx.moveTo(-13, -8);
-      ctx.bezierCurveTo(-5, -18, 9, -15, 15, -3);
-      // Нижняя/внутренняя вогнутая дуга
-      ctx.bezierCurveTo(6, 5, -4, 4, -12, -3);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Светлый блик вдоль кожуры
-      ctx.strokeStyle = 'rgba(255, 252, 214, 0.8)';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(-8, -9);
-      ctx.bezierCurveTo(-1, -14, 7, -12, 11, -5);
-      ctx.stroke();
-
-      // Тёмный кончик-хвостик
-      ctx.fillStyle = '#4a2605';
-      ctx.beginPath();
-      ctx.arc(-13.5, -6, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
+        ctx.fillStyle = '#ffd60a';
+        ctx.strokeStyle = '#7f5500';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(-4, 0, 13, -0.85, 0.85);
+        ctx.arc(2, 0, 10, 0.85, -0.85, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
-    // --- Запасная обезьянка в стиле monkey.jpg (если спрайт ещё не подгрузился) ---
     function drawFallbackMonkey() {
-      // Рубашка/туловище
-      ctx.fillStyle = '#1f6fd4';
+      ctx.fillStyle = '#8b4513';
       ctx.beginPath();
-      ctx.roundRect(-14, -2, 28, 22, 8);
+      ctx.ellipse(0, 8, 18, 22, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Рукава
-      ctx.fillStyle = '#8b3e12';
+      ctx.fillStyle = '#2b6cb0';
+      ctx.fillRect(-15, 16, 30, 14);
+
+      ctx.fillStyle = '#a0522d';
       ctx.beginPath();
-      ctx.roundRect(-22, 0, 10, 14, 5);
-      ctx.roundRect(12, 0, 10, 14, 5);
+      ctx.arc(0, -14, 17, 0, Math.PI * 2);
       ctx.fill();
 
-      // Штаны
-      ctx.fillStyle = '#195fb8';
+      ctx.fillStyle = '#f3d5b5';
       ctx.beginPath();
-      ctx.roundRect(-12, 16, 10, 12, 4);
-      ctx.roundRect(2, 16, 10, 12, 4);
+      ctx.ellipse(0, -11, 11, 10, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Голова и мордочка
-      ctx.fillStyle = '#e59a24';
-      ctx.beginPath();
-      ctx.arc(0, -14, 15, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#f3cba0';
-      ctx.beginPath();
-      ctx.ellipse(0, -11, 10, 9, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Глаза
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.arc(-4.5, -16, 3.6, 0, Math.PI * 2);
-      ctx.arc(4.5, -16, 3.6, 0, Math.PI * 2);
+      ctx.arc(-5, -16, 4.5, 0, Math.PI * 2);
+      ctx.arc(5, -16, 4.5, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#181018';
+      ctx.fillStyle = '#111';
       ctx.beginPath();
-      ctx.arc(-4.5, -16, 1.6, 0, Math.PI * 2);
-      ctx.arc(4.5, -16, 1.6, 0, Math.PI * 2);
+      ctx.arc(-5, -16, 2, 0, Math.PI * 2);
+      ctx.arc(5, -16, 2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Кепка с пропеллером
-      ctx.fillStyle = '#e03131';
+      ctx.fillStyle = '#e63946';
       ctx.beginPath();
-      ctx.arc(0, -22, 14, Math.PI, 0);
-      ctx.fill();
-
-      ctx.fillStyle = '#2f9e44';
-      ctx.fillRect(-14, -23, 28, 4);
-
-      const bladeLen = Math.max(4, Math.abs(Math.cos(state.propellerAngle)) * 22);
-      ctx.fillStyle = '#ff6b6b';
-      ctx.fillRect(-bladeLen, -39, bladeLen * 2, 4);
-      ctx.fillStyle = '#339af0';
-      ctx.beginPath();
-      ctx.arc(0, -37, 3.5, 0, Math.PI * 2);
+      ctx.arc(0, -25, 16, Math.PI, 0);
       ctx.fill();
     }
 
-    function drawPlayer() {
-      const p = state.player;
+    function drawMonkey() {
       ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.tilt);
+      ctx.translate(player.x, player.y);
+      ctx.rotate(player.angle);
 
-      if (spriteLoaded && cleanSpriteCanvas) {
-        const size = 68;
-        ctx.drawImage(cleanSpriteCanvas, -size * 0.5, -size * 0.5, size, size);
+      if (player.cymbalTimer > 0) {
+        ctx.strokeStyle = 'rgba(255, 224, 102, 0.75)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 4, 44 + (0.35 - player.cymbalTimer) * 45, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
-        // Динамический вращающийся пропеллер поверх кепки
-        const bladeW = Math.max(3, Math.abs(Math.cos(state.propellerAngle)) * 24);
+      if (spriteLoaded && customSprite) {
+        const w = customSprite.width || 1;
+        const h = customSprite.height || 1;
+        const targetH = 88;
+        const scale = targetH / h;
+        const drawW = w * scale;
+        const drawH = h * scale;
+        ctx.drawImage(customSprite, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+
+        // Динамическое размытие лопасти поверх пропеллера при наборе высоты
+        const thrusting = state === 'playing' && holding && player.energy > 0;
+        const blurWidth = thrusting ? 46 + Math.sin(player.propellerPhase) * 10 : 18;
         ctx.save();
-        ctx.translate(0, -34);
-        ctx.fillStyle = '#fa5252';
-        ctx.strokeStyle = '#2b1218';
-        ctx.lineWidth = 1.4;
+        ctx.translate(0, -drawH * 0.44);
+        ctx.fillStyle = thrusting
+          ? 'rgba(255, 90, 90, 0.36)'
+          : 'rgba(255, 255, 255, 0.14)';
         ctx.beginPath();
-        ctx.roundRect(-bladeW, -2.2, bladeW * 2, 4.4, 2.2);
+        ctx.ellipse(0, 0, blurWidth, thrusting ? 5 : 2.5, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#339af0';
-        ctx.beginPath();
-        ctx.arc(0, 0, 3.6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
         ctx.restore();
       } else {
         drawFallbackMonkey();
@@ -978,49 +1254,65 @@
     }
 
     function drawEffects() {
-      for (const pt of state.particles) {
-        const alpha = Math.max(0, pt.life / pt.maxLife);
+      for (const p of particles) {
+        const alpha = Math.max(0, p.life / p.maxLife);
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = pt.color;
+        ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
 
-      for (const pop of state.popups) {
-        const alpha = Math.max(0, Math.min(1, pop.life / 0.75));
+      for (const ft of floatingTexts) {
+        const alpha = Math.max(0, ft.life / ft.maxLife);
         ctx.save();
         ctx.globalAlpha = alpha;
-        ctx.font = '800 16px sans-serif';
+        ctx.font = '800 15px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffe066';
-        ctx.strokeStyle = 'rgba(20, 8, 22, 0.85)';
-        ctx.lineWidth = 3.5;
-        ctx.strokeText(pop.text, pop.x, pop.y);
-        ctx.fillText(pop.text, pop.x, pop.y);
+        ctx.fillStyle = '#111827';
+        ctx.fillText(ft.text, ft.x + 1.5, ft.y + 1.5);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
         ctx.restore();
+      }
+
+      if (hitFlash > 0) {
+        ctx.fillStyle = `rgba(239, 68, 68, ${hitFlash * 0.55})`;
+        ctx.fillRect(0, 0, width, height);
       }
     }
 
-    // --- Игровой цикл ---
-    let lastTs = performance.now();
-
-    function update(dt) {
-      state.time += dt;
-      const groundY = height - 64;
-
-      // Плавное движение облаков и города
-      for (const cl of clouds) {
-        cl.x -= cl.speed * dt;
-        if (cl.x < -90) cl.x = width + 70;
+    function render() {
+      ctx.save();
+      if (screenShake > 0) {
+        const sx = (Math.random() - 0.5) * screenShake;
+        const sy = (Math.random() - 0.5) * screenShake;
+        ctx.translate(sx, sy);
       }
 
-      if (state.shake > 0) {
-        state.shake = Math.max(0, state.shake - dt * 28);
-      }
+      drawBackground();
+      drawBananas();
+      drawObstacles();
+      drawMonkey();
+      drawEffects();
 
-      if (state.mode === 'start') {
-        state.propellerAngle += dt * 14;
-        state.player.y = Math.min(groundY - 120, Math
+      ctx.restore();
+    }
+
+    let lastTime = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt);
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    resize();
+    resetGame();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
