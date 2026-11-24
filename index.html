@@ -3,273 +3,59 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Monkey Propeller Jetpack</title>
+  <title>Полёт</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #1a2234;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #fff;
-      touch-action: none;
-    }
-
-    #game-wrapper {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-
-    .hud {
-      position: absolute;
-      top: 14px;
-      left: 14px;
-      right: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-      pointer-events: none;
-      z-index: 10;
-    }
-
-    .hud-left {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-width: 165px;
-      max-width: 240px;
-      width: 45%;
-    }
-
-    .energy-box {
-      background: rgba(15, 22, 36, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 12px;
-      padding: 8px 10px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-    }
-
-    .energy-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.4px;
-      margin-bottom: 5px;
-      color: #ffe28a;
-    }
-
-    .energy-track {
-      width: 100%;
-      height: 10px;
-      background: rgba(255, 255, 255, 0.14);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .energy-fill {
-      height: 100%;
-      width: 100%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #ff6b35 0%, #ffb703 55%, #52b788 100%);
-      transition: width 0.06s linear;
-    }
-
-    .hud-right {
-      display: flex;
-      gap: 8px;
-    }
-
-    .stat-pill {
-      background: rgba(15, 22, 36, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 12px;
-      padding: 8px 12px;
-      text-align: right;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
-    }
-
-    .stat-title {
-      font-size: 10px;
-      text-transform: uppercase;
-      opacity: 0.75;
-      letter-spacing: 0.6px;
-    }
-
-    .stat-value {
-      font-size: 18px;
-      font-weight: 800;
-      line-height: 1.15;
-    }
-
-    .overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      background: rgba(10, 15, 26, 0.55);
-      z-index: 20;
-      transition: opacity 0.2s ease;
-    }
-
-    .overlay.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .card {
-      width: 100%;
-      max-width: 380px;
-      background: rgba(20, 29, 48, 0.94);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 22px;
-      padding: 24px 20px;
-      text-align: center;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-    }
-
-    .badge {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: #ffd166;
-      background: rgba(255, 209, 102, 0.14);
-      border: 1px solid rgba(255, 209, 102, 0.3);
-      padding: 4px 10px;
-      border-radius: 999px;
-      margin-bottom: 10px;
-    }
-
-    h1 {
-      font-size: 24px;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
-
-    p.desc {
-      font-size: 14px;
-      line-height: 1.45;
-      color: rgba(255, 255, 255, 0.82);
-      margin-bottom: 18px;
-    }
-
-    .btn-primary {
-      width: 100%;
-      border: none;
-      border-radius: 14px;
-      padding: 14px 18px;
-      font-size: 16px;
-      font-weight: 800;
-      color: #161b26;
-      background: linear-gradient(135deg, #ffd166 0%, #f77f00 100%);
-      cursor: pointer;
-      box-shadow: 0 10px 24px rgba(247, 127, 0, 0.35);
-      transition: transform 0.1s ease;
-    }
-
-    .btn-primary:active {
-      transform: scale(0.97);
-    }
-
-    .btn-secondary {
-      margin-top: 10px;
-      width: 100%;
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #fff;
-      background: rgba(255, 255, 255, 0.08);
-      cursor: pointer;
-    }
-
-    .sprite-status {
-      margin-top: 8px;
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.68);
-    }
-
-    .final-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 18px;
-    }
-
-    .final-box {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 14px;
-      padding: 12px;
-    }
-
-    .final-box .num {
-      font-size: 22px;
-      font-weight: 800;
-      color: #ffd166;
-    }
-
-    .final-box .lbl {
-      font-size: 11px;
-      opacity: 0.75;
-      margin-top: 2px;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #162032; font-family: Arial, sans-serif; color: #fff; touch-action: none; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; z-index: 5; }
+    .box { background: rgba(12, 18, 30, 0.78); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 8px 12px; }
+    .bar { width: 140px; height: 8px; background: rgba(255,255,255,0.15); border-radius: 99px; overflow: hidden; margin-top: 5px; }
+    .fill { height: 100%; width: 100%; background: #ffb703; }
+    .stats { display: flex; gap: 8px; }
+    .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(10, 15, 25, 0.65); padding: 16px; z-index: 10; }
+    .hidden { display: none; }
+    .card { width: 100%; max-width: 340px; background: #1c2840; border: 1px solid rgba(255,255,255,0.2); border-radius: 18px; padding: 20px; text-align: center; }
+    .btn { width: 100%; margin-top: 12px; padding: 12px; border: none; border-radius: 12px; background: #ffb703; color: #111; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .btn2 { width: 100%; margin-top: 8px; padding: 9px; border: 1px solid rgba(255,255,255,0.25); border-radius: 10px; background: transparent; color: #fff; font-size: 13px; cursor: pointer; }
+    .info { margin-top: 8px; font-size: 12px; color: #cbd5e1; }
   </style>
 </head>
 <body>
-  <div id="game-wrapper">
-    <canvas id="gameCanvas"></canvas>
+  <canvas id="c"></canvas>
 
-    <div class="hud">
-      <div class="hud-left">
-        <div class="energy-box">
-          <div class="energy-label">
-            <span>⚡ ЭНЕРГИЯ ПРОПЕЛЛЕРА</span>
-            <span id="energyText">100%</span>
-          </div>
-          <div class="energy-track">
-            <div class="energy-fill" id="energyFill"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="hud-right">
-        <div class="stat-pill">
-          <div class="stat-title">Очки</div>
-          <div class="stat-value" id="scoreVal">0</div>
-        </div>
-        <div class="stat-pill">
-          <div class="stat-title">Рекорд</div>
-          <div class="stat-value" id="bestVal">0</div>
-        </div>
-      </div>
+  <div class="hud">
+    <div class="box">
+      <div>⚡ Энергия: <span id="eTxt">100%</span></div>
+      <div class="bar"><div class="fill" id="eBar"></div></div>
     </div>
+    <div class="stats">
+      <div class="box">Очки: <b id="sTxt">0</b></div>
+      <div class="box">Рекорд: <b id="bTxt">0</b></div>
+    </div>
+  </div>
 
-    <div class="overlay" id="startOverlay">
-      <div class="card">
-        <div class="badge">Telegram Mini App</div>
-        <h1 id="greetingTitle">Полёт
+  <div class="overlay" id="startScreen">
+    <div class="card">
+      <h2>Полёт</h2>
+      <p class="info">Зажми экран или пробел — летишь вверх. Отпусти — планируешь. Бананы дают энергию.</p>
+      <button class="btn" id="playBtn">Играть</button>
+      <button class="btn2" id="pickBtn">Выбрать картинку вручную</button>
+      <div class="info" id="sprTxt">Спрайт: monkey.png</div>
+      <input type="file" id="fileInp" accept="image/*" hidden />
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="endScreen">
+    <div class="card">
+      <h2 id="endTitle">Конец полёта</h2>
+      <p class="info" id="endReason"></p>
+      <p class="info">Очки: <b id="finalS">0</b> | Рекорд: <b id="finalB">0</b></p>
+      <button class="btn" id="againBtn">Ещё раз</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const SPR
