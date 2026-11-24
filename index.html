@@ -224,4 +224,428 @@
     }
 
     .final-box {
-      background: rgba(
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .final-box .num {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffd166;
+    }
+
+    .final-box .lbl {
+      font-size: 11px;
+      opacity: 0.75;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="hud">
+      <div class="hud-left">
+        <div class="energy-box">
+          <div class="energy-label">
+            <span>⚡ ЭНЕРГИЯ ПРОПЕЛЛЕРА</span>
+            <span id="energyText">100%</span>
+          </div>
+          <div class="energy-track">
+            <div class="energy-fill" id="energyFill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <div class="stat-pill">
+          <div class="stat-title">Бананы</div>
+          <div class="stat-value" id="scoreVal">0</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-title">Рекорд</div>
+          <div class="stat-value" id="bestVal">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div class="badge">Telegram Mini App</div>
+        <h1 id="greetingTitle">Полёт на пропеллере</h1>
+        <p class="desc">
+          <b>Зажми экран</b> (или пробел), чтобы раскрутить пропеллер и набрать высоту.
+          <b>Отпусти</b>, чтобы плавно планировать вниз. Лови бананы 🍌 — они восстанавливают энергию!
+        </p>
+        <button class="btn-primary" id="startBtn">ПОЛЕТЕЛИ!</button>
+        <button class="btn-secondary" id="uploadSpriteBtn">Заменить спрайт вручную (PNG)</button>
+        <div class="sprite-status" id="spriteStatus">Загрузка monkey.png...</div>
+        <input type="file" id="spriteInput" accept="image/*" hidden />
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="gameOverOverlay">
+      <div class="card">
+        <div class="badge">Полёт завершён</div>
+        <h1>Столкновение!</h1>
+        <p class="desc" id="failReason">Энергия закончилась или ты задел препятствие.</p>
+        <div class="final-stats">
+          <div class="final-box">
+            <div class="num" id="finalScore">0</div>
+            <div class="lbl">БАНАНЫ</div>
+          </div>
+          <div class="final-box">
+            <div class="num" id="finalBest">0</div>
+            <div class="lbl">ЛУЧШИЙ СЧЁТ</div>
+          </div>
+        </div>
+        <button class="btn-primary" id="restartBtn">ИГРАТЬ СНОВА</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Имя файла спрайта в корне репозитория рядом с index.html
+    const SPRITE_SRC = 'monkey.png';
+
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (user && user.first_name) {
+        document.getElementById('greetingTitle').textContent = `Вперёд, ${user.first_name}!`;
+      }
+    }
+
+    function haptic(type = 'light') {
+      try {
+        if (tg && tg.HapticFeedback) {
+          if (type === 'error') tg.HapticFeedback.notificationOccurred('error');
+          else if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
+          else tg.HapticFeedback.impactOccurred(type);
+        }
+      } catch (_) {}
+    }
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const energyFill = document.getElementById('energyFill');
+    const energyText = document.getElementById('energyText');
+    const scoreVal = document.getElementById('scoreVal');
+    const bestVal = document.getElementById('bestVal');
+    const startOverlay = document.getElementById('startOverlay');
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const failReason = document.getElementById('failReason');
+    const finalScore = document.getElementById('finalScore');
+    const finalBest = document.getElementById('finalBest');
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
+    const uploadSpriteBtn = document.getElementById('uploadSpriteBtn');
+    const spriteInput = document.getElementById('spriteInput');
+    const spriteStatus = document.getElementById('spriteStatus');
+
+    let customSprite = null;
+    let spriteLoaded = false;
+
+    // Автоматически убираем тёмный/зелёный фон, если файл не имеет альфа-канала
+    function cleanKeyBackground(img) {
+      const w = img.naturalWidth || img.width;
+      const h = img.naturalHeight || img.height;
+      if (!w || !h) return img;
+
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d');
+      octx.drawImage(img, 0, 0, w, h);
+
+      let data;
+      try {
+        data = octx.getImageData(0, 0, w, h);
+      } catch (_) {
+        return img;
+      }
+
+      const px = data.data;
+      let hasTransparent = false;
+      for (let i = 3; i < px.length; i += 4) {
+        if (px[i] < 250) {
+          hasTransparent = true;
+          break;
+        }
+      }
+      if (hasTransparent) return off;
+
+      const corners = [
+        [0, 0],
+        [w - 1, 0],
+        [0, h - 1],
+        [w - 1, h - 1]
+      ];
+      let bgR = 0, bgG = 0, bgB = 0;
+      for (const [cx, cy] of corners) {
+        const idx = (cy * w + cx) * 4;
+        bgR += px[idx];
+        bgG += px[idx + 1];
+        bgB += px[idx + 2];
+      }
+      bgR /= 4; bgG /= 4; bgB /= 4;
+
+      const isBlackBg = bgR < 22 && bgG < 22 && bgB < 22;
+      const isGreenBg = bgG > bgR + 45 && bgG > bgB + 45;
+
+      if (!isBlackBg && !isGreenBg) return off;
+
+      for (let i = 0; i < px.length; i += 4) {
+        const r = px[i], g = px[i + 1], b = px[i + 2];
+        if (isBlackBg) {
+          const maxC = Math.max(r, g, b);
+          if (maxC < 26) px[i + 3] = 0;
+          else if (maxC < 52) px[i + 3] = Math.round(((maxC - 26) / 26) * 255);
+        } else if (isGreenBg) {
+          const greenExcess = g - Math.max(r, b);
+          if (greenExcess > 40) px[i + 3] = 0;
+          else if (greenExcess > 15) px[i + 3] = Math.round((1 - (greenExcess - 15) / 25) * 255);
+        }
+      }
+
+      octx.putImageData(data, 0, 0);
+      return off;
+    }
+
+    function loadSpriteFromUrl(url, labelText) {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        customSprite = cleanKeyBackground(img);
+        spriteLoaded = true;
+        spriteStatus.textContent = labelText || `Спрайт загружен: ${url}`;
+      };
+      img.onerror = () => {
+        spriteLoaded = false;
+        customSprite = null;
+        spriteStatus.textContent = `Файл "${url}" не найден — используется запасной рисунок`;
+      };
+      img.src = url + (url.startsWith('blob:') ? '' : `?v=${Date.now()}`);
+    }
+
+    loadSpriteFromUrl(SPRITE_SRC, `Подключён спрайт: ${SPRITE_SRC}`);
+
+    uploadSpriteBtn.addEventListener('click', () => spriteInput.click());
+    spriteInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      loadSpriteFromUrl(url, `Загружен файл: ${file.name}`);
+    });
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+    let groundHeight = 84;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      groundHeight = Math.max(72, Math.min(96, height * 0.12));
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      initScenery();
+    }
+
+    let clouds = [];
+    let farBuildings = [];
+    let midBuildings = [];
+    let streetProps = [];
+
+    function randomDubaiStyle() {
+      const r = Math.random();
+      if (r < 0.24) return 'burj';
+      if (r < 0.48) return 'twist';
+      if (r < 0.68) return 'sail';
+      return 'glass';
+    }
+
+    function initScenery() {
+      clouds = Array.from({ length: 6 }, (_, i) => ({
+        x: (width / 5) * i + Math.random() * 80,
+        y: 55 + Math.random() * (height * 0.24),
+        scale: 0.65 + Math.random() * 0.65,
+        speed: 10 + Math.random() * 14
+      }));
+
+      farBuildings = [];
+      let fx = -40;
+      while (fx < width + 240) {
+        const bw = 60 + Math.random() * 65;
+        const bh = 120 + Math.random() * 155;
+        farBuildings.push({
+          x: fx,
+          w: bw,
+          h: bh,
+          style: randomDubaiStyle()
+        });
+        fx += bw + 10;
+      }
+
+      midBuildings = [];
+      let mx = -60;
+      while (mx < width + 280) {
+        const bw = 96 + Math.random() * 68;
+        const bh = 145 + Math.random() * 145;
+        const cols = Math.max(3, Math.floor((bw - 20) / 22));
+        const rows = Math.max(4, Math.floor((bh - 30) / 28));
+        const litWindows = [];
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            litWindows.push(Math.random() < 0.42);
+          }
+        }
+        midBuildings.push({
+          x: mx,
+          w: bw,
+          h: bh,
+          cols,
+          rows,
+          litWindows,
+          tone: Math.floor(Math.random() * 3),
+          style: randomDubaiStyle()
+        });
+        mx += bw + 18;
+      }
+
+      streetProps = [];
+      let sx = 40;
+      while (sx < width + 240) {
+        streetProps.push({
+          x: sx,
+          type: Math.random() < 0.55 ? 'lamp' : 'tree',
+          scale: 0.85 + Math.random() * 0.3
+        });
+        sx += 135 + Math.random() * 90;
+      }
+    }
+
+    window.addEventListener('resize', resize);
+
+    let bestScore = Number(localStorage.getItem('monkey_jetpack_best') || 0);
+    bestVal.textContent = bestScore;
+
+    let state = 'menu';
+    let holding = false;
+    let score = 0;
+    let worldSpeed = 210;
+    let screenShake = 0;
+    let hitFlash = 0;
+    let elapsed = 0;
+
+    const player = {
+      x: 110,
+      y: 220,
+      vy: 0,
+      radiusX: 28,
+      radiusY: 38,
+      angle: 0,
+      energy: 100,
+      maxEnergy: 100,
+      propellerPhase: 0,
+      cymbalTimer: 0
+    };
+
+    let obstacles = [];
+    let bananas = [];
+    let particles = [];
+    let floatingTexts = [];
+    let spawnTimer = 0;
+    let bananaPatternTimer = 0;
+
+    function resetGame() {
+      player.x = Math.min(150, Math.max(85, width * 0.24));
+      player.y = Math.max(130, (height - groundHeight) * 0.42);
+      player.vy = 0;
+      player.angle = 0;
+      player.energy = 100;
+      player.propellerPhase = 0;
+      player.cymbalTimer = 0;
+
+      obstacles = [];
+      bananas = [];
+      particles = [];
+      floatingTexts = [];
+      score = 0;
+      worldSpeed = 215;
+      screenShake = 0;
+      hitFlash = 0;
+      spawnTimer = 1.1;
+      bananaPatternTimer = 0.6;
+
+      scoreVal.textContent = '0';
+      updateEnergyUI();
+    }
+
+    function startGame() {
+      resetGame();
+      state = 'playing';
+      startOverlay.classList.add('hidden');
+      gameOverOverlay.classList.add('hidden');
+      haptic('medium');
+    }
+
+    function endGame(reason) {
+      if (state === 'gameover') return;
+      state = 'gameover';
+      holding = false;
+      screenShake = 14;
+      hitFlash = 0.45;
+      haptic('error');
+
+      const finalInt = Math.floor(score);
+      if (finalInt > bestScore) {
+        bestScore = finalInt;
+        localStorage.setItem('monkey_jetpack_best', String(bestScore));
+      }
+
+      failReason.textContent = reason;
+      finalScore.textContent = finalInt;
+      finalBest.textContent = bestScore;
+      bestVal.textContent = bestScore;
+      gameOverOverlay.classList.remove('hidden');
+    }
+
+    function updateEnergyUI() {
+      const pct = Math.max(0, Math.min(100, Math.round((player.energy / player.maxEnergy) * 100)));
+      energyFill.style.width = `${pct}%`;
+      energyText.textContent = `${pct}%`;
+    }
+
+    function setHolding(active) {
+      if (state !== 'playing') {
+        holding = false;
+        return;
+      }
+      if (active && !holding && player.energy > 1) {
+        haptic('light');
+      }
+      holding = active;
+    }
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button') || e.target.closest('.overlay')) return;
+      setHolding(true);
+    });
+    window.addEventListener('pointerup', () => setHolding(false));
+    window.addEventListener('pointercancel', () => setHolding(false));
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+        if (state === 'playing') {
+          e.preventDefault();
+          setHolding(true);
+        }
