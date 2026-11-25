@@ -428,6 +428,29 @@
       });
     }
 
+    function playBarkSound() {
+      if (!soundEnabled) return;
+      const ctxAudio = ensureAudioContext();
+      if (!ctxAudio) return;
+
+      const t = ctxAudio.currentTime;
+      const osc = ctxAudio.createOscillator();
+      const gain = ctxAudio.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(340, t);
+      osc.frequency.exponentialRampToValueAtTime(520, t + 0.045);
+      osc.frequency.exponentialRampToValueAtTime(240, t + 0.13);
+
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.07, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+      osc.connect(gain);
+      gain.connect(ctxAudio.destination);
+      osc.start(t);
+      osc.stop(t + 0.15);
+    }
+
     function playCrashSound() {
       if (!soundEnabled) return;
       const ctxAudio = ensureAudioContext();
@@ -520,14 +543,14 @@
     let midBuildings = [];
     let streetProps = [];
 
-    // Персонаж Павла Дурова, прогуливающийся по улице и машущий пролетающей обезьянке
-    const durov = {
+    // Уиппет в красной кофточке с высоким воротником, бегающий по улице
+    const whippetDog = {
       x: 260,
-      dir: 1, // 1 — идёт вправо, -1 — влево
-      walkSpeed: 42,
-      walkPhase: 0,
-      wavePhase: 0,
-      waving: false,
+      dir: 1, // 1 — вправо, -1 — влево
+      runSpeed: 64,
+      runPhase: 0,
+      happyPhase: 0,
+      greeting: false,
       greetCooldown: 0
     };
 
@@ -598,7 +621,7 @@
         sx += 135 + Math.random() * 90;
       }
 
-      durov.x = Math.max(80, Math.min(width - 80, width * 0.56));
+      whippetDog.x = Math.max(85, Math.min(width - 85, width * 0.58));
     }
 
     window.addEventListener('resize', resize);
@@ -644,8 +667,8 @@
       player.propellerPhase = 0;
       player.cymbalTimer = 0;
 
-      durov.greetCooldown = 0;
-      durov.waving = false;
+      whippetDog.greetCooldown = 0;
+      whippetDog.greeting = false;
 
       obstacles = [];
       bananas = [];
@@ -865,40 +888,40 @@
       return 'Столкновение с препятствием!';
     }
 
-    function updateDurov(dt) {
-      if (durov.greetCooldown > 0) {
-        durov.greetCooldown = Math.max(0, durov.greetCooldown - dt);
+    function updateWhippetDog(dt) {
+      if (whippetDog.greetCooldown > 0) {
+        whippetDog.greetCooldown = Math.max(0, whippetDog.greetCooldown - dt);
       }
 
-      const dx = player.x - durov.x;
+      const dx = player.x - whippetDog.x;
       const dy = (height - groundHeight) - player.y;
-      const nearMonkey = Math.abs(dx) < 175 && dy < 270;
+      const nearMonkey = Math.abs(dx) < 180 && dy < 275;
 
       if (nearMonkey) {
-        durov.waving = true;
-        durov.wavePhase += dt * 13;
-        // Поворачиваемся лицом к пролетающей обезьянке
+        whippetDog.greeting = true;
+        whippetDog.happyPhase += dt * 15;
         if (Math.abs(dx) > 8) {
-          durov.dir = dx >= 0 ? 1 : -1;
+          whippetDog.dir = dx >= 0 ? 1 : -1;
         }
-        if (state === 'playing' && durov.greetCooldown <= 0) {
-          durov.greetCooldown = 3.2;
-          addFloatingText(durov.x, (height - groundHeight) - 68, '👋', '#ffffff');
+        if (state === 'playing' && whippetDog.greetCooldown <= 0) {
+          whippetDog.greetCooldown = 3.4;
+          playBarkSound();
+          addFloatingText(whippetDog.x, (height - groundHeight) - 56, '🐾', '#ffe066');
         }
       } else {
-        durov.waving = false;
-        durov.wavePhase = 0;
-        const leftBound = Math.max(65, width * 0.28);
-        const rightBound = Math.max(leftBound + 80, width - 65);
-        durov.x += durov.dir * durov.walkSpeed * dt;
-        durov.walkPhase += dt * 8.5;
+        whippetDog.greeting = false;
+        whippetDog.happyPhase = 0;
+        const leftBound = Math.max(70, width * 0.26);
+        const rightBound = Math.max(leftBound + 90, width - 70);
+        whippetDog.x += whippetDog.dir * whippetDog.runSpeed * dt;
+        whippetDog.runPhase += dt * 14;
 
-        if (durov.x >= rightBound) {
-          durov.x = rightBound;
-          durov.dir = -1;
-        } else if (durov.x <= leftBound) {
-          durov.x = leftBound;
-          durov.dir = 1;
+        if (whippetDog.x >= rightBound) {
+          whippetDog.x = rightBound;
+          whippetDog.dir = -1;
+        } else if (whippetDog.x <= leftBound) {
+          whippetDog.x = leftBound;
+          whippetDog.dir = 1;
         }
       }
     }
@@ -910,7 +933,7 @@
       if (hitFlash > 0) hitFlash = Math.max(0, hitFlash - dt * 1.4);
       if (player.cymbalTimer > 0) player.cymbalTimer = Math.max(0, player.cymbalTimer - dt);
 
-      updateDurov(dt);
+      updateWhippetDog(dt);
 
       const bgFactor = state === 'playing' ? 1 : 0.35;
 
@@ -1305,86 +1328,187 @@
       }
     }
 
-    // Отрисовка Дурова на тротуаре (чёрная футболка, очки, шаги и взмах рукой)
-    function drawDurov() {
+    // Бегущий по дороге уиппет в терракотово-красной флисовой кофте с высоким воротником
+    function drawWhippetDog() {
       const groundY = height - groundHeight;
-      const bob = durov.waving ? 0 : Math.abs(Math.sin(durov.walkPhase)) * -2.2;
-      const stepSwing = durov.waving ? 0 : Math.sin(durov.walkPhase) * 7;
+      const isGreeting = whippetDog.greeting;
+      const bounce = isGreeting
+        ? -Math.abs(Math.sin(whippetDog.happyPhase * 0.6)) * 5
+        : -Math.abs(Math.sin(whippetDog.runPhase)) * 3.2;
+
+      const legSwing = isGreeting
+        ? Math.sin(whippetDog.happyPhase) * 3
+        : Math.sin(whippetDog.runPhase) * 8;
+
+      const tailWag = isGreeting
+        ? Math.sin(whippetDog.happyPhase * 1.4) * 0.65
+        : Math.sin(whippetDog.runPhase * 0.8) * 0.25;
 
       ctx.save();
-      ctx.translate(durov.x, groundY + bob);
-      ctx.scale(durov.dir, 1);
+      ctx.translate(whippetDog.x, groundY + bounce);
+      ctx.scale(whippetDog.dir, 1);
 
-      // Лёгкая тень под ногами
+      // Тень под лапами
       ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
       ctx.beginPath();
-      ctx.ellipse(0, 1, 14, 4, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 2 - bounce, 18, 4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Ноги в тёмных брюках
-      ctx.strokeStyle = '#1b2230';
-      ctx.lineWidth = 4.5;
+      // Тонкий изогнутый хвост уиппета
+      ctx.save();
+      ctx.translate(-15, -16);
+      ctx.rotate(tailWag);
+      ctx.strokeStyle = '#c8c4be';
+      ctx.lineWidth = 2.6;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(-3, -16);
-      ctx.lineTo(-3 + stepSwing, -2);
-      ctx.moveTo(3, -16);
-      ctx.lineTo(3 - stepSwing, -2);
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-8, 4, -10, -4);
+      ctx.stroke();
+      ctx.restore();
+
+      // Дальние лапы (чуть темнее для объёма)
+      ctx.strokeStyle = '#b8b4ae';
+      ctx.lineWidth = 2.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      // Задняя дальняя
+      ctx.moveTo(-11, -13);
+      ctx.lineTo(-13 - legSwing * 0.8, -1);
+      // Передняя дальняя
+      ctx.moveTo(9, -13);
+      ctx.lineTo(10 + legSwing * 0.8, -1);
       ctx.stroke();
 
-      // Фирменная чёрная футболка
-      ctx.fillStyle = '#14171f';
-      ctx.beginPath();
-      ctx.roundRect(-9, -34, 18, 19, 5);
-      ctx.fill();
-
-      // Левая рука (при ходьбе качается, при приветствии — машет вверх)
-      ctx.strokeStyle = '#f2c6a0';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      if (durov.waving) {
-        const waveAngle = -2.35 + Math.sin(durov.wavePhase) * 0.42;
-        const handX = 7 + Math.cos(waveAngle) * 14;
-        const handY = -31 + Math.sin(waveAngle) * 14;
-        ctx.moveTo(7, -31);
-        ctx.lineTo(handX, handY);
-        ctx.stroke();
-
-        // Кисть руки
-        ctx.fillStyle = '#f2c6a0';
-        ctx.beginPath();
-        ctx.arc(handX, handY, 3.2, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.moveTo(6, -31);
-        ctx.lineTo(6 - stepSwing * 0.7, -19);
-        ctx.stroke();
-      }
-
-      // Голова
-      ctx.fillStyle = '#f2c6a0';
-      ctx.beginPath();
-      ctx.arc(0, -42, 8.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Тёмные волосы
-      ctx.fillStyle = '#231f20';
-      ctx.beginPath();
-      ctx.arc(0, -43.5, 8.6, Math.PI * 0.95, Math.PI * 2.08);
-      ctx.fill();
-
-      // Тёмные солнцезащитные очки (смотрят в сторону движения / обезьянки)
-      ctx.fillStyle = '#0d1017';
-      ctx.fillRect(0.5, -44, 8.5, 4);
-
-      // Лёгкая бородка/усы
-      ctx.strokeStyle = '#3b2f2f';
+      // Поджарый силуэт тела уиппета в терракотово-красной флисовой кофте
+      ctx.fillStyle = '#9e2a1c';
+      ctx.strokeStyle = '#6e190f';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(2, -37.5);
-      ctx.lineTo(7.5, -37.5);
+      ctx.moveTo(-16, -15);
+      ctx.quadraticCurveTo(-4, -22, 12, -20);
+      ctx.lineTo(14, -11);
+      ctx.quadraticCurveTo(2, -9, -14, -12);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
 
+      // Текстурный шов рукава на кофте
+      ctx.strokeStyle = '#7c1d12';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(8, -15, 4.5, -0.4, 1.9);
+      ctx.stroke();
+
+      // Ближние стройные лапы
+      ctx.strokeStyle = '#e5e2dc';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      // Задняя ближняя
+      ctx.moveTo(-10, -13);
+      ctx.lineTo(-11 + legSwing, -1);
+      // Передняя ближняя (при приветствии радостно приподнимает лапку)
+      if (isGreeting) {
+        const pawLift = Math.sin(whippetDog.happyPhase) * 3;
+        ctx.moveTo(9, -13);
+        ctx.lineTo(15, -9 + pawLift);
+        ctx.lineTo(19, -12 + pawLift);
+      } else {
+        ctx.moveTo(9, -13);
+        ctx.lineTo(9 - legSwing, -1);
+      }
+      ctx.stroke();
+
+      // Высокий воротник-стойка (как на обложке DOGUE)
+      ctx.fillStyle = '#a83020';
+      ctx.strokeStyle = '#731b10';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(5, -18);
+      ctx.lineTo(8, -32);
+      ctx.lineTo(19, -30);
+      ctx.lineTo(15, -14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Верхняя тонкая кайма воротника
+      ctx.strokeStyle = '#c84b36';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(8, -32);
+      ctx.lineTo(19, -30);
+      ctx.stroke();
+
+      // Голова и длинная изящная морда уиппета (бело-серебристая)
+      ctx.save();
+      ctx.translate(14, -33);
+      if (isGreeting) {
+        ctx.rotate(-0.22); // Слегка задирает голову вверх, глядя на обезьянку
+      }
+
+      // Шея, выглядывающая из воротника
+      ctx.fillStyle = '#dcdad5';
+      ctx.beginPath();
+      ctx.moveTo(-5, 4);
+      ctx.lineTo(-3, -4);
+      ctx.lineTo(5, -3);
+      ctx.lineTo(3, 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // Череп и длинная узкая морда
+      ctx.fillStyle = '#eceae6';
+      ctx.strokeStyle = '#9e9b95';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(-4, -5);
+      ctx.quadraticCurveTo(2, -8, 8, -5);
+      ctx.lineTo(20, -2.5); // длинная переносица
+      ctx.quadraticCurveTo(22, -1, 20, 1.5); // кончик морды
+      ctx.lineTo(7, 2.5);
+      ctx.quadraticCurveTo(1, 3, -4, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Тёмная линия губ
+      ctx.strokeStyle = '#2b2927';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(11, 1.2);
+      ctx.lineTo(19.5, 0.8);
+      ctx.stroke();
+
+      // Чёрный носик на самом кончике
+      ctx.fillStyle = '#1f1e1d';
+      ctx.beginPath();
+      ctx.arc(20.6, -1.2, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Тёплый карий глаз с бликом
+      ctx.fillStyle = '#5c3a21';
+      ctx.beginPath();
+      ctx.arc(7.5, -3.2, 1.9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(8, -3.7, 0.65, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Фирменное заложенное назад серо-дымчатое ушко уиппета
+      ctx.fillStyle = '#8b8a88';
+      ctx.strokeStyle = '#5e5d5b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(1, -5.5);
+      ctx.quadraticCurveTo(-5, -7, -7, 0.5);
+      ctx.quadraticCurveTo(-4, 1.5, -1, -2.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
       ctx.restore();
     }
 
@@ -1696,7 +1820,7 @@
       }
 
       drawBackground();
-      drawDurov();
+      drawWhippetDog();
       drawBananas();
       drawObstacles();
       drawMonkey();
