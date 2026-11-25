@@ -47,7 +47,7 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 12px;
+      gap: 10px;
       pointer-events: none;
       z-index: 10;
     }
@@ -56,9 +56,9 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
-      min-width: 170px;
+      min-width: 160px;
       max-width: 240px;
-      width: 45%;
+      width: 44%;
     }
 
     .energy-box {
@@ -73,7 +73,7 @@
     .energy-label {
       display: flex;
       justify-content: space-between;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.4px;
       margin-bottom: 5px;
@@ -99,19 +99,19 @@
     .hud-right {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
 
-    .sound-btn {
+    .hud-icon-btn {
       pointer-events: auto;
-      width: 44px;
+      width: 42px;
       height: 44px;
       border-radius: 12px;
       border: 1px solid rgba(255, 255, 255, 0.18);
       background: rgba(15, 22, 36, 0.72);
       backdrop-filter: blur(8px);
       color: #fff;
-      font-size: 18px;
+      font-size: 17px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -120,11 +120,11 @@
       transition: transform 0.1s ease, background 0.15s ease;
     }
 
-    .sound-btn:active {
+    .hud-icon-btn:active {
       transform: scale(0.94);
     }
 
-    .sound-btn.muted {
+    .hud-icon-btn.muted {
       opacity: 0.65;
       color: #ff8fa3;
     }
@@ -134,7 +134,7 @@
       border: 1px solid rgba(255, 255, 255, 0.18);
       backdrop-filter: blur(8px);
       border-radius: 12px;
-      padding: 8px 12px;
+      padding: 8px 11px;
       text-align: right;
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
     }
@@ -271,7 +271,8 @@
       </div>
 
       <div class="hud-right">
-        <button class="sound-btn" id="soundBtn" type="button" aria-label="Звук">🔊</button>
+        <button class="hud-icon-btn" id="companionCycleBtn" type="button" title="Сменить персонажа на дороге">🐕</button>
+        <button class="hud-icon-btn" id="soundBtn" type="button" aria-label="Звук">🔊</button>
         <div class="stat-pill">
           <div class="stat-title">Бананы</div>
           <div class="stat-value" id="scoreVal">0</div>
@@ -338,7 +339,9 @@
       } catch (_) {}
     }
 
+    // --- Звуковой синтезатор на Web Audio API ---
     const soundBtn = document.getElementById('soundBtn');
+    const companionCycleBtn = document.getElementById('companionCycleBtn');
     let soundEnabled = localStorage.getItem('monkey_jetpack_sound') !== 'off';
     let audioCtx = null;
     let lastRotorTick = 0;
@@ -576,7 +579,14 @@
       happyPhase: 0,
       greeting: false,
       greetCooldown: 0,
-      role: 'dog'
+      role: 'dog',
+      manualOverride: false
+    };
+
+    const ROLE_ICONS = {
+      dog: '🐕',
+      sheikh: '👳‍♂️',
+      durov: '🕶️'
     };
 
     function getCompanionRoleByScore(pts) {
@@ -584,6 +594,40 @@
       if (pts >= 100) return 'sheikh';
       return 'dog';
     }
+
+    function updateCompanionBtnUI() {
+      companionCycleBtn.textContent = ROLE_ICONS[streetCompanion.role] || '🐕';
+    }
+    updateCompanionBtnUI();
+
+    function setCompanionRole(newRole, announce = true) {
+      if (streetCompanion.role === newRole) return;
+      streetCompanion.role = newRole;
+      streetCompanion.greetCooldown = 0;
+      updateCompanionBtnUI();
+
+      const groundY = height - groundHeight;
+      addParticles(streetCompanion.x, groundY - 32, 16, ['#ffd166', '#ffffff', '#90e0ef'], [40, 120]);
+      if (announce) {
+        if (newRole === 'durov') {
+          addFloatingText(streetCompanion.x, groundY - 84, '200 🍌 · ПАВЕЛ ДУРОВ', '#90e0ef');
+        } else if (newRole === 'sheikh') {
+          addFloatingText(streetCompanion.x, groundY - 80, '100 🍌 · ШЕЙХ', '#ffd166');
+        } else {
+          addFloatingText(streetCompanion.x, groundY - 62, 'УИППЕТ', '#ffe066');
+        }
+      }
+    }
+
+    companionCycleBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    companionCycleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const order = ['dog', 'sheikh', 'durov'];
+      const next = order[(order.indexOf(streetCompanion.role) + 1) % order.length];
+      streetCompanion.manualOverride = true;
+      setCompanionRole(next, true);
+      haptic('light');
+    });
 
     function randomDubaiStyle() {
       const r = Math.random();
@@ -699,8 +743,10 @@
       player.cymbalTimer = 0;
 
       streetCompanion.role = 'dog';
+      streetCompanion.manualOverride = false;
       streetCompanion.greetCooldown = 0;
       streetCompanion.greeting = false;
+      updateCompanionBtnUI();
 
       obstacles = [];
       bananas = [];
@@ -940,16 +986,10 @@
     }
 
     function updateStreetCompanion(dt) {
-      const targetRole = getCompanionRoleByScore(score);
-      if (streetCompanion.role !== targetRole) {
-        streetCompanion.role = targetRole;
-        streetCompanion.greetCooldown = 0;
-        const groundY = height - groundHeight;
-        addParticles(streetCompanion.x, groundY - 28, 16, ['#ffd166', '#ffffff', '#90e0ef'], [40, 120]);
-        if (targetRole === 'sheikh') {
-          addFloatingText(streetCompanion.x, groundY - 72, '100 🍌 · ШЕЙХ!', '#ffd166');
-        } else if (targetRole === 'durov') {
-          addFloatingText(streetCompanion.x, groundY - 76, '200 🍌 · ДУРОВ!', '#90e0ef');
+      if (!streetCompanion.manualOverride) {
+        const targetRole = getCompanionRoleByScore(score);
+        if (streetCompanion.role !== targetRole) {
+          setCompanionRole(targetRole, true);
         }
       }
 
@@ -975,10 +1015,10 @@
             addFloatingText(streetCompanion.x, groundY - 56, '🐾', '#ffe066');
           } else if (streetCompanion.role === 'sheikh') {
             playGreetChime();
-            addFloatingText(streetCompanion.x, groundY - 74, '👋', '#ffd166');
+            addFloatingText(streetCompanion.x, groundY - 78, '👋', '#ffd166');
           } else {
             playGreetChime();
-            addFloatingText(streetCompanion.x, groundY - 76, '👋', '#90e0ef');
+            addFloatingText(streetCompanion.x, groundY - 82, '👋', '#90e0ef');
           }
         }
       } else {
@@ -986,7 +1026,7 @@
         streetCompanion.happyPhase = 0;
         const leftBound = Math.max(70, width * 0.26);
         const rightBound = Math.max(leftBound + 90, width - 70);
-        const speed = streetCompanion.role === 'dog' ? 64 : 44;
+        const speed = streetCompanion.role === 'dog' ? 64 : 46;
         const freq = streetCompanion.role === 'dog' ? 14 : 8.5;
 
         streetCompanion.x += streetCompanion.dir * speed * dt;
@@ -1454,7 +1494,7 @@
       }
     }
 
-    // 1) Уиппет в красной кофточке (0..99 бананов)
+    // 1) Уиппет в красной кофточке
     function drawWhippetDog() {
       const groundY = height - groundHeight;
       const isGreeting = streetCompanion.greeting;
@@ -1619,7 +1659,7 @@
       ctx.restore();
     }
 
-    // 2) Дубайский шейх в кандуре и гутре с игалем (100..199 бананов)
+    // 2) Дубайский шейх в кандуре и гутре с игалем
     function drawSheikh() {
       const groundY = height - groundHeight;
       const isGreeting = streetCompanion.greeting;
@@ -1630,50 +1670,45 @@
       ctx.translate(streetCompanion.x, groundY + bob);
       ctx.scale(streetCompanion.dir, 1);
 
-      // Тень
       ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
       ctx.beginPath();
       ctx.ellipse(0, 2 - bob, 16, 4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Сандалии под подолом кандуры
       ctx.fillStyle = '#5c3a21';
       ctx.beginPath();
       ctx.roundRect(-7 - step, -3.5, 7, 3.5, 1.5);
       ctx.roundRect(1 + step, -3.5, 7, 3.5, 1.5);
       ctx.fill();
 
-      // Белоснежная традиционная кандура (длинная туника)
       ctx.fillStyle = '#f8fafc';
       ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(-9, -40);
-      ctx.lineTo(9, -40);
+      ctx.moveTo(-9, -42);
+      ctx.lineTo(9, -42);
       ctx.lineTo(13, -3);
       ctx.lineTo(-13, -3);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Вертикальная декоративная строчка на груди и кисточка (тарбуш)
       ctx.strokeStyle = '#e2e8f0';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(4, -39);
-      ctx.lineTo(4, -22);
+      ctx.moveTo(4, -41);
+      ctx.lineTo(4, -24);
       ctx.stroke();
 
-      // Рука (в белом рукаве, при приветствии поднимается вверх)
       ctx.strokeStyle = '#f8fafc';
       ctx.lineWidth = 5.5;
       ctx.lineCap = 'round';
       ctx.beginPath();
       if (isGreeting) {
         const waveAngle = -2.25 + Math.sin(streetCompanion.happyPhase) * 0.35;
-        const handX = 6 + Math.cos(waveAngle) * 14;
-        const handY = -34 + Math.sin(waveAngle) * 14;
-        ctx.moveTo(6, -34);
+        const handX = 6 + Math.cos(waveAngle) * 15;
+        const handY = -36 + Math.sin(waveAngle) * 15;
+        ctx.moveTo(6, -36);
         ctx.lineTo(handX, handY);
         ctx.stroke();
 
@@ -1682,262 +1717,287 @@
         ctx.arc(handX, handY, 3.3, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        ctx.moveTo(4, -35);
-        ctx.lineTo(4 - step * 0.8, -20);
+        ctx.moveTo(4, -37);
+        ctx.lineTo(4 - step * 0.8, -21);
         ctx.stroke();
 
         ctx.fillStyle = '#d99b66';
         ctx.beginPath();
-        ctx.arc(4 - step * 0.8, -19.5, 2.8, 0, Math.PI * 2);
+        ctx.arc(4 - step * 0.8, -20.5, 2.8, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Задняя ниспадающая ткань гутры (платка)
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(-6, -54);
-      ctx.quadraticCurveTo(-15, -44, -14, -27);
-      ctx.lineTo(-5, -29);
+      ctx.moveTo(-6, -56);
+      ctx.quadraticCurveTo(-15, -46, -14, -28);
+      ctx.lineTo(-5, -30);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Лицо
       ctx.fillStyle = '#d99b66';
       ctx.beginPath();
-      ctx.arc(1, -47, 8.2, 0, Math.PI * 2);
+      ctx.arc(1, -49, 8.2, 0, Math.PI * 2);
       ctx.fill();
 
-      // Ухоженная арабская борода и усы
       ctx.fillStyle = '#18181b';
       ctx.beginPath();
-      ctx.arc(1.5, -45.5, 8.2, 0.05, Math.PI * 0.92);
-      ctx.lineTo(-3, -44);
-      ctx.quadraticCurveTo(3, -41.5, 8.8, -44.2);
+      ctx.arc(1.5, -47.5, 8.2, 0.05, Math.PI * 0.92);
+      ctx.lineTo(-3, -46);
+      ctx.quadraticCurveTo(3, -43.5, 8.8, -46.2);
       ctx.closePath();
       ctx.fill();
 
-      // Усы и добрая улыбка
       ctx.fillStyle = '#18181b';
-      ctx.fillRect(2.5, -44.8, 6.2, 1.8);
+      ctx.fillRect(2.5, -46.8, 6.2, 1.8);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(4, -42.6, 3.6, 1.2);
+      ctx.fillRect(4, -44.6, 3.6, 1.2);
 
-      // Выразительные тёмные глаза и брови
       ctx.fillStyle = '#111827';
       ctx.beginPath();
-      ctx.arc(5, -48.5, 1.4, 0, Math.PI * 2);
+      ctx.arc(5, -50.5, 1.4, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#18181b';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(3, -50.6);
-      ctx.lineTo(7.5, -50.4);
+      ctx.moveTo(3, -52.6);
+      ctx.lineTo(7.5, -52.4);
       ctx.stroke();
 
-      // Верх гутры (белый платок)
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#cbd5e1';
       ctx.lineWidth = 1.3;
       ctx.beginPath();
-      ctx.arc(0.5, -49.5, 9.2, Math.PI * 0.95, Math.PI * 2.04);
+      ctx.arc(0.5, -51.5, 9.2, Math.PI * 0.95, Math.PI * 2.04);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Чёрный двойной шнур игаль с золотой нитью
       ctx.fillStyle = '#111111';
       ctx.strokeStyle = '#eab308';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(-8.8, -53.2, 18.6, 3.8, 1.8);
+      ctx.roundRect(-8.8, -55.2, 18.6, 3.8, 1.8);
       ctx.fill();
       ctx.stroke();
 
       ctx.restore();
     }
 
-    // 3) Максимально детализированный Павел Дуров (200+ бананов)
+    // 3) Реалистичный пропорциональный Павел Дуров (сразу с 0 бананов)
     function drawDurov() {
       const groundY = height - groundHeight;
       const isGreeting = streetCompanion.greeting;
-      const bob = isGreeting ? 0 : Math.abs(Math.sin(streetCompanion.movePhase)) * -2;
-      const stepSwing = isGreeting ? 0 : Math.sin(streetCompanion.movePhase) * 6.5;
+      const bob = isGreeting ? 0 : Math.abs(Math.sin(streetCompanion.movePhase)) * -1.8;
+      const stepSwing = isGreeting ? 0 : Math.sin(streetCompanion.movePhase) * 7.5;
 
       ctx.save();
       ctx.translate(streetCompanion.x, groundY + bob);
       ctx.scale(streetCompanion.dir, 1);
 
-      // Тень
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+      // Тень на асфальте
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.34)';
       ctx.beginPath();
       ctx.ellipse(0, 2 - bob, 16, 4.2, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Чёрные облегающие брюки и чёрные кроссовки/ботинки
-      ctx.strokeStyle = '#12151c';
-      ctx.lineWidth = 5;
+      // Дальняя рука (при ходьбе — в противофазе шагу)
+      if (!isGreeting) {
+        ctx.strokeStyle = '#c8926b';
+        ctx.lineWidth = 3.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(4, -44);
+        ctx.lineTo(5 + stepSwing * 0.75, -26);
+        ctx.stroke();
+      }
+
+      // Длинные стройные ноги в чёрных джинсах
+      ctx.strokeStyle = '#12151d';
+      ctx.lineWidth = 4.6;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(-3.5, -20);
-      ctx.lineTo(-4 + stepSwing, -3);
-      ctx.moveTo(3.5, -20);
-      ctx.lineTo(4 - stepSwing, -3);
+      // Дальняя нога
+      ctx.moveTo(-2.5, -25);
+      ctx.lineTo(-3 - stepSwing, -3.5);
+      // Ближняя нога
+      ctx.moveTo(2.5, -25);
+      ctx.lineTo(3 + stepSwing, -3.5);
       ctx.stroke();
 
-      ctx.fillStyle = '#090b0f';
+      // Чёрные минималистичные кроссовки
+      ctx.fillStyle = '#090b10';
       ctx.beginPath();
-      ctx.roundRect(-6.5 + stepSwing, -4.5, 8.5, 4, 2);
-      ctx.roundRect(1.5 - stepSwing, -4.5, 8.5, 4, 2);
+      ctx.roundRect(-6.5 - stepSwing, -5, 8.5, 3.8, 1.8);
+      ctx.roundRect(-0.5 + stepSwing, -5, 8.5, 3.8, 1.8);
       ctx.fill();
 
-      // Атлетичный V-образный торс в фирменной облегающей чёрной футболке
-      const shirtGrad = ctx.createLinearGradient(-10, -40, 10, -18);
-      shirtGrad.addColorStop(0, '#1f2430');
-      shirtGrad.addColorStop(0.5, '#11141c');
+      // Атлетичный V-образный торс в облегающей чёрной футболке (естественные пропорции)
+      const shirtGrad = ctx.createLinearGradient(-10, -49, 10, -24);
+      shirtGrad.addColorStop(0, '#222733');
+      shirtGrad.addColorStop(0.5, '#12151e');
       shirtGrad.addColorStop(1, '#090b10');
       ctx.fillStyle = shirtGrad;
-      ctx.strokeStyle = '#2c3342';
-      ctx.lineWidth = 1.1;
+      ctx.strokeStyle = '#2e3545';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(-11, -39); // широкие плечи
-      ctx.lineTo(11, -39);
-      ctx.lineTo(7.5, -18); // приталенный силуэт
-      ctx.lineTo(-7.5, -18);
+      ctx.moveTo(-9.5, -48); // широкие плечи
+      ctx.lineTo(9.5, -48);
+      ctx.lineTo(6.2, -24); // узкая талия
+      ctx.lineTo(-6.2, -24);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Рельеф грудных мышц и воротник футболки
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 1.2;
+      // Контур грудных мышц и рельеф пресса под облегающей футболкой
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.09)';
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
-      ctx.arc(4, -32, 4.5, 0.2, 1.8);
+      ctx.arc(3.5, -40, 4.2, 0.25, 1.85);
+      ctx.moveTo(2.5, -34);
+      ctx.lineTo(2, -27);
       ctx.stroke();
 
-      // Короткий облегающий рукав футболки
-      ctx.fillStyle = '#151922';
+      // Короткий облегающий рукав
+      ctx.fillStyle = '#161a24';
       ctx.beginPath();
-      ctx.roundRect(4, -39, 7, 7, 3);
+      ctx.roundRect(2.5, -48, 6.8, 7.5, 2.8);
       ctx.fill();
 
-      // Рельефная рука (при ходьбе — в движении, при приветствии — уверенно машет)
-      ctx.strokeStyle = '#eab892';
-      ctx.lineWidth = 4.4;
+      // Ближняя рельефная рука (при приближении обезьянки поднимает и плавно машет)
+      ctx.strokeStyle = '#e7b48d';
+      ctx.lineWidth = 4;
       ctx.lineCap = 'round';
       ctx.beginPath();
       if (isGreeting) {
-        const waveAngle = -2.28 + Math.sin(streetCompanion.happyPhase) * 0.38;
-        const elbowX = 9 + Math.cos(waveAngle + 0.35) * 7.5;
-        const elbowY = -33 + Math.sin(waveAngle + 0.35) * 7.5;
-        const handX = elbowX + Math.cos(waveAngle - 0.15) * 8.5;
-        const handY = elbowY + Math.sin(waveAngle - 0.15) * 8.5;
-        ctx.moveTo(8, -34);
+        const waveAngle = -2.25 + Math.sin(streetCompanion.happyPhase) * 0.36;
+        const elbowX = 7.5 + Math.cos(waveAngle + 0.32) * 8;
+        const elbowY = -42 + Math.sin(waveAngle + 0.32) * 8;
+        const handX = elbowX + Math.cos(waveAngle - 0.14) * 9;
+        const handY = elbowY + Math.sin(waveAngle - 0.14) * 9;
+
+        ctx.moveTo(6.5, -43);
         ctx.lineTo(elbowX, elbowY);
         ctx.lineTo(handX, handY);
         ctx.stroke();
 
-        ctx.fillStyle = '#eab892';
+        // Кисть руки
+        ctx.fillStyle = '#e7b48d';
         ctx.beginPath();
-        ctx.arc(handX, handY, 3.2, 0, Math.PI * 2);
+        ctx.arc(handX, handY, 2.8, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        const armSwing = stepSwing * 0.75;
-        ctx.moveTo(7.5, -34);
-        ctx.lineTo(8 - armSwing * 0.5, -26);
-        ctx.lineTo(9 - armSwing, -18.5);
+        const armSwing = stepSwing * 0.72;
+        ctx.moveTo(6, -43);
+        ctx.lineTo(6.5 - armSwing * 0.45, -34);
+        ctx.lineTo(7 - armSwing, -25.5);
         ctx.stroke();
 
-        ctx.fillStyle = '#eab892';
+        ctx.fillStyle = '#e7b48d';
         ctx.beginPath();
-        ctx.arc(9 - armSwing, -18, 2.7, 0, Math.PI * 2);
+        ctx.arc(7 - armSwing, -25, 2.4, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Крепкая шея
+      // Крепкая пропорциональная шея
+      ctx.fillStyle = '#dca57c';
+      ctx.fillRect(-3.2, -51.5, 6.4, 4.5);
+
+      // Голова в естественном масштабе (чуть вытянутый овал лица со скулами и подбородком)
+      ctx.save();
+      ctx.translate(0.5, -58.5);
+      if (isGreeting) {
+        ctx.rotate(-0.14); // Слегка поднимает взгляд вверх на пролетающую обезьянку
+      }
+
+      // Контур лица: высокий лоб, выраженная скула, волевой подбородок
+      ctx.fillStyle = '#e7b48d';
+      ctx.strokeStyle = '#c58e66';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(-6.2, -2);
+      ctx.quadraticCurveTo(-6.5, 4.5, -2.5, 7.2);
+      ctx.lineTo(3.6, 7.4); // чёткая линия челюсти и подбородка
+      ctx.quadraticCurveTo(6.8, 5.2, 6.6, -1.2);
+      ctx.quadraticCurveTo(5.8, -7.8, -0.5, -7.8);
+      ctx.quadraticCurveTo(-6, -7.5, -6.2, -2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Лёгкая тень скулы и аккуратная щетина по линии челюсти
+      ctx.fillStyle = 'rgba(58, 46, 42, 0.2)';
+      ctx.beginPath();
+      ctx.moveTo(-2.5, 3.6);
+      ctx.lineTo(5.5, 3.6);
+      ctx.lineTo(3.8, 7.1);
+      ctx.lineTo(-2.2, 7.0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Прямой нос в профиль/три четверти
+      ctx.strokeStyle = '#bf855e';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(5.2, -1.5);
+      ctx.lineTo(7.1, 2.1);
+      ctx.lineTo(5.1, 2.5);
+      ctx.stroke();
+
+      // Спокойный уверенный рот
+      ctx.strokeStyle = '#8a5843';
+      ctx.lineWidth = 1.15;
+      ctx.beginPath();
+      ctx.moveTo(1.8, 4.5);
+      ctx.lineTo(5.4, 4.4);
+      ctx.stroke();
+
+      // Ухо
       ctx.fillStyle = '#dfa980';
-      ctx.fillRect(-3.5, -42, 7, 4.5);
-
-      // Голова со скульптурными скулами и волевым подбородком
-      ctx.fillStyle = '#eab892';
-      ctx.strokeStyle = '#c9936b';
-      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(-7.5, -51);
-      ctx.quadraticCurveTo(-8.2, -43, -3.5, -40.2);
-      ctx.lineTo(4.2, -40); // выраженный подбородок
-      ctx.quadraticCurveTo(8.5, -42.5, 8.2, -50);
-      ctx.quadraticCurveTo(6.5, -57.5, -1, -57.5);
-      ctx.quadraticCurveTo(-7.5, -57, -7.5, -51);
-      ctx.closePath();
+      ctx.ellipse(-3.6, 0.6, 1.5, 2.4, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
 
-      // Лёгкая скульптурная тень под скулой и щетина
-      ctx.fillStyle = 'rgba(65, 52, 46, 0.22)';
+      // Тёмные густые волосы с объёмом на макушке и чётким виском
+      ctx.fillStyle = '#18161b';
       ctx.beginPath();
-      ctx.moveTo(-3, -44);
-      ctx.lineTo(6.8, -44);
-      ctx.lineTo(4.5, -40.3);
-      ctx.lineTo(-3.2, -40.5);
+      ctx.moveTo(-6.6, 0.5);
+      ctx.quadraticCurveTo(-7.6, -6.5, -2.2, -9.2);
+      ctx.quadraticCurveTo(4.2, -10.4, 7.2, -5.8); // объёмная чёлка назад
+      ctx.quadraticCurveTo(4.4, -4.2, 0.2, -5.0);
+      ctx.quadraticCurveTo(-3.4, -5.2, -4.2, 0.8); // аккуратный висок
       ctx.closePath();
       ctx.fill();
 
-      // Спокойный сдержанный рот
-      ctx.strokeStyle = '#8c5a44';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.moveTo(2, -43);
-      ctx.lineTo(6.6, -43);
-      ctx.stroke();
-
-      // Прямой нос
-      ctx.strokeStyle = '#c58b63';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.moveTo(6.5, -49.5);
-      ctx.lineTo(8.3, -45.5);
-      ctx.lineTo(6.3, -45);
-      ctx.stroke();
-
-      // Фирменная тёмная причёска с объёмом спереди и зачёсом назад
-      ctx.fillStyle = '#1b191e';
-      ctx.beginPath();
-      ctx.moveTo(-8.2, -48);
-      ctx.quadraticCurveTo(-9.2, -56, -3, -58.8);
-      ctx.quadraticCurveTo(4.5, -60.2, 8.6, -55.2); // чёлка с лёгким объёмом
-      ctx.quadraticCurveTo(5.5, -53.2, 0.5, -54.2);
-      ctx.quadraticCurveTo(-4.2, -54.5, -5.2, -47.5); // висок
-      ctx.closePath();
-      ctx.fill();
-
-      // Знаменитые тёмные солнцезащитные очки с глянцевым бликом
-      ctx.fillStyle = '#07090d';
+      // Фирменные тёмные солнцезащитные очки с тонкой перемычкой и бликом
+      ctx.fillStyle = '#06080c';
       ctx.strokeStyle = '#333b4d';
-      ctx.lineWidth = 1.1;
+      ctx.lineWidth = 0.95;
       ctx.beginPath();
-      ctx.roundRect(0.2, -51.8, 9.2, 4.6, 1.4);
+      ctx.roundRect(0.2, -3.2, 7.6, 3.8, 1.1);
       ctx.fill();
       ctx.stroke();
 
       // Дужка очков к уху
-      ctx.strokeStyle = '#141821';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#12161f';
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
-      ctx.moveTo(-5, -49.5);
-      ctx.lineTo(0.5, -50);
+      ctx.moveTo(-3.6, -0.6);
+      ctx.lineTo(0.4, -1.5);
       ctx.stroke();
 
-      // Глянцевый диагональный блик на линзе очков
+      // Диагональный глянцевый блик на стекле очков
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.lineWidth = 1.1;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(2.2, -51.1);
-      ctx.lineTo(4.4, -48.1);
+      ctx.moveTo(1.8, -2.6);
+      ctx.lineTo(3.6, -0.1);
       ctx.stroke();
 
+      ctx.restore();
       ctx.restore();
     }
 
