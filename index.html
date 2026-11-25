@@ -779,30 +779,45 @@
 
     function spawnObstacle() {
       const playableTop = 74;
-      const playableBottom = height - groundHeight - 18;
+      const playableBottom = height - groundHeight - 10;
       const playableH = Math.max(160, playableBottom - playableTop);
 
       const typeRoll = Math.random();
       if (typeRoll < 0.42) {
-        // Верхнее препятствие: грозовая туча с молнией
-        const w = 68;
-        const h = Math.min(132, Math.max(76, playableH * (0.2 + Math.random() * 0.14)));
-        obstacles.push({
-          kind: 'storm_cloud',
-          x: width + 45,
-          y: playableTop,
-          w,
-          h,
-          boltPhase: Math.random() * Math.PI * 2
-        });
+        // Верхние препятствия: рекламный дирижабль @JollyChimpGem или грозовая туча
+        if (Math.random() < 0.5) {
+          const w = 152;
+          const h = 64;
+          const by = playableTop + 14 + Math.random() * Math.max(24, playableH * 0.16);
+          obstacles.push({
+            kind: 'blimp',
+            x: width + 90,
+            y: by,
+            baseY: by,
+            w,
+            h,
+            phase: Math.random() * Math.PI * 2
+          });
+        } else {
+          const w = 74;
+          const h = Math.min(138, Math.max(80, playableH * (0.21 + Math.random() * 0.14)));
+          obstacles.push({
+            kind: 'storm_cloud',
+            x: width + 45,
+            y: playableTop,
+            w,
+            h,
+            boltPhase: Math.random() * Math.PI * 2
+          });
+        }
       } else if (typeRoll < 0.76) {
-        // Нижние препятствия: восточный фонарный столб или пальма
+        // Нижние крупные препятствия: высокая финиковая пальма или восточный фонарный столб
         const isPalm = Math.random() < 0.52;
-        const w = isPalm ? 36 : 30;
-        const h = Math.min(132, Math.max(66, playableH * (0.16 + Math.random() * 0.14)));
+        const w = isPalm ? 62 : 48;
+        const h = Math.min(220, Math.max(125, playableH * (0.31 + Math.random() * 0.16)));
         obstacles.push({
           kind: isPalm ? 'palm' : 'lamp',
-          x: width + 40,
+          x: width + 50,
           y: playableBottom - h,
           w,
           h,
@@ -886,9 +901,10 @@
       if (obs.kind === 'carpet') return 'Не поделил небо с летающим ковром над Дубаем!';
       if (obs.kind === 'taxi') return 'Подрезал дубайское аэротакси в час пик!';
       if (obs.kind === 'falcon') return 'Пересёк траекторию пустынного сокола!';
+      if (obs.kind === 'blimp') return 'Врезался в рекламный дирижабль @JollyChimpGem!';
       if (obs.kind === 'storm_cloud') return 'Попал под разряд грозовой тучи!';
-      if (obs.kind === 'palm') return 'Задел крону пальмы во время полёта!';
-      if (obs.kind === 'lamp') return 'Врезался в восточный фонарный столб!';
+      if (obs.kind === 'palm') return 'Задел крону высокой пальмы во время полёта!';
+      if (obs.kind === 'lamp') return 'Врезался в большой восточный фонарный столб!';
       return 'Столкновение с препятствием!';
     }
 
@@ -1047,6 +1063,9 @@
         if (obs.kind === 'carpet' || obs.kind === 'taxi' || obs.kind === 'falcon') {
           obs.phase += dt * (obs.kind === 'falcon' ? 4.4 : 3.2);
           obs.y = obs.baseY + Math.sin(obs.phase) * (obs.kind === 'carpet' ? 24 : 18);
+        } else if (obs.kind === 'blimp') {
+          obs.phase += dt * 2.1;
+          obs.y = obs.baseY + Math.sin(obs.phase) * 9;
         } else if (obs.kind === 'storm_cloud') {
           obs.boltPhase += dt * 7;
         } else if (obs.kind === 'palm' || obs.kind === 'lamp') {
@@ -1054,17 +1073,34 @@
         }
 
         let hit = false;
+        const playerHitR = Math.min(player.radiusX, player.radiusY) * 0.74;
+
         if (obs.kind === 'carpet' || obs.kind === 'taxi' || obs.kind === 'falcon') {
           const dx = player.x - obs.x;
           const dy = player.y - obs.y;
-          const sumR = obs.r * 0.85 + Math.min(player.radiusX, player.radiusY) * 0.74;
+          const sumR = obs.r * 0.85 + playerHitR;
           hit = (dx * dx + dy * dy) < (sumR * sumR);
+        } else if (obs.kind === 'blimp') {
+          // Эллиптический баллон дирижабля + гондола снизу
+          const nx = (player.x - obs.x) / (obs.w * 0.48 + playerHitR * 0.8);
+          const ny = (player.y - obs.y) / (obs.h * 0.34 + playerHitR * 0.8);
+          const hitBalloon = (nx * nx + ny * ny) < 1;
+          const hitGondola = circleRectCollide(
+            player.x,
+            player.y,
+            playerHitR * 0.85,
+            obs.x - 24,
+            obs.y + obs.h * 0.3,
+            48,
+            14
+          );
+          hit = hitBalloon || hitGondola;
         } else if (obs.kind === 'storm_cloud') {
-          const cloudH = Math.min(44, obs.h * 0.45);
+          const cloudH = Math.min(46, obs.h * 0.45);
           const hitCloud = circleRectCollide(
             player.x,
             player.y,
-            Math.min(player.radiusX, player.radiusY) * 0.75,
+            playerHitR,
             obs.x + 4,
             obs.y + 4,
             obs.w - 8,
@@ -1073,7 +1109,7 @@
           const hitBolt = circleRectCollide(
             player.x,
             player.y,
-            Math.min(player.radiusX, player.radiusY) * 0.65,
+            playerHitR * 0.88,
             obs.x + obs.w * 0.36,
             obs.y + cloudH - 2,
             obs.w * 0.28,
@@ -1084,28 +1120,34 @@
           const hitTrunk = circleRectCollide(
             player.x,
             player.y,
-            Math.min(player.radiusX, player.radiusY) * 0.72,
-            obs.x + obs.w * 0.3,
-            obs.y + 18,
-            obs.w * 0.4,
-            obs.h - 20
+            playerHitR,
+            obs.x + obs.w * 0.34,
+            obs.y + 30,
+            obs.w * 0.32,
+            obs.h - 32
           );
           const crownX = obs.x + obs.w * 0.5;
-          const crownY = obs.y + 14;
+          const crownY = obs.y + 24;
           const dx = player.x - crownX;
           const dy = player.y - crownY;
-          const crownR = 22 + Math.min(player.radiusX, player.radiusY) * 0.65;
+          const crownR = 32 + playerHitR * 0.85;
           hit = hitTrunk || (dx * dx + dy * dy) < (crownR * crownR);
-        } else {
-          hit = circleRectCollide(
+        } else if (obs.kind === 'lamp') {
+          const hitPole = circleRectCollide(
             player.x,
             player.y,
-            Math.min(player.radiusX, player.radiusY) * 0.76,
-            obs.x + 3,
-            obs.y + 3,
-            obs.w - 6,
-            obs.h - 6
+            playerHitR,
+            obs.x + obs.w * 0.34,
+            obs.y + 28,
+            obs.w * 0.32,
+            obs.h - 30
           );
+          const lanternX = obs.x + obs.w * 0.5;
+          const lanternY = obs.y + 18;
+          const dx = player.x - lanternX;
+          const dy = player.y - lanternY;
+          const lanternR = 20 + playerHitR * 0.85;
+          hit = hitPole || (dx * dx + dy * dy) < (lanternR * lanternR);
         }
 
         if (hit) {
@@ -1114,7 +1156,7 @@
           return;
         }
 
-        if (obs.x + (obs.w || obs.r * 2.4) < -110) {
+        if (obs.x + (obs.w || obs.r * 2.4) < -160) {
           obstacles.splice(i, 1);
         }
       }
@@ -1523,13 +1565,96 @@
 
     function drawObstacles() {
       for (const obs of obstacles) {
-        if (obs.kind === 'storm_cloud') {
-          // Грозовая туча сверху с зигзагом молнии
+        if (obs.kind === 'blimp') {
+          // Рекламный дирижабль с надписью @JollyChimpGem
+          ctx.save();
+          ctx.translate(obs.x, obs.y);
+          ctx.rotate(Math.sin(obs.phase) * 0.035);
+
+          const rx = obs.w * 0.5;
+          const ry = obs.h * 0.36;
+
+          // Хвостовые стабилизаторы (справа, т.к. дирижабль летит влево)
+          ctx.fillStyle = '#d62828';
+          ctx.strokeStyle = '#1b263b';
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.moveTo(rx - 14, -ry * 0.45);
+          ctx.lineTo(rx + 12, -ry - 9);
+          ctx.lineTo(rx + 6, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(rx - 14, ry * 0.45);
+          ctx.lineTo(rx + 12, ry + 9);
+          ctx.lineTo(rx + 6, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Тросы подвеса и пассажирская гондола
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(-16, ry - 2);
+          ctx.lineTo(-14, ry + 8);
+          ctx.moveTo(16, ry - 2);
+          ctx.lineTo(14, ry + 8);
+          ctx.stroke();
+
+          ctx.fillStyle = '#1e293b';
+          ctx.strokeStyle = '#ffd166';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(-22, ry + 7, 44, 11, 4);
+          ctx.fill();
+          ctx.stroke();
+
+          // Основной баллон дирижабля
+          const blimpGrad = ctx.createLinearGradient(0, -ry, 0, ry);
+          blimpGrad.addColorStop(0, '#3b5998');
+          blimpGrad.addColorStop(0.55, '#1d3557');
+          blimpGrad.addColorStop(1, '#0f1c30');
+          ctx.fillStyle = blimpGrad;
+          ctx.strokeStyle = '#ffd166';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          // Светящееся рекламное табло по центру борта
+          ctx.fillStyle = 'rgba(255, 209, 102, 0.16)';
+          ctx.beginPath();
+          ctx.roundRect(-rx * 0.78, -11, rx * 1.56, 22, 8);
+          ctx.fill();
+
+          // Текст @JollyChimpGem
+          ctx.font = '800 12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#090d16';
+          ctx.fillText('@JollyChimpGem', 1, 1.5);
+          ctx.fillStyle = '#ffd166';
+          ctx.fillText('@JollyChimpGem', 0, 0);
+
+          // Вращающийся хвостовой винт
+          const propH = Math.abs(Math.cos(elapsed * 28)) * 10 + 3;
+          ctx.strokeStyle = '#ffe066';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(rx + 9, -propH);
+          ctx.lineTo(rx + 9, propH);
+          ctx.stroke();
+
+          ctx.restore();
+        } else if (obs.kind === 'storm_cloud') {
           const cx = obs.x + obs.w * 0.5;
           const cloudY = obs.y + 20;
           const flash = Math.sin(obs.boltPhase * 2.3) > 0.35;
 
-          // Зигзаг молнии вниз от тучи
           const boltTop = cloudY + 12;
           const boltBot = Math.max(boltTop + 14, obs.y + obs.h - 4);
           const midY = (boltTop + boltBot) * 0.52;
@@ -1538,7 +1663,7 @@
             ctx.save();
             ctx.fillStyle = 'rgba(255, 224, 102, 0.25)';
             ctx.beginPath();
-            ctx.arc(cx, midY, 24, 0, Math.PI * 2);
+            ctx.arc(cx, midY, 26, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
           }
@@ -1547,134 +1672,149 @@
           ctx.strokeStyle = '#b56500';
           ctx.lineWidth = 1.6;
           ctx.beginPath();
-          ctx.moveTo(cx + 5, boltTop);
-          ctx.lineTo(cx - 7, midY + 1);
+          ctx.moveTo(cx + 6, boltTop);
+          ctx.lineTo(cx - 8, midY + 1);
           ctx.lineTo(cx + 1, midY + 2);
-          ctx.lineTo(cx - 6, boltBot);
-          ctx.lineTo(cx + 8, midY - 2);
+          ctx.lineTo(cx - 7, boltBot);
+          ctx.lineTo(cx + 9, midY - 2);
           ctx.lineTo(cx + 1, midY - 3);
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
 
-          // Тело тёмно-синей грозовой тучи
           ctx.fillStyle = '#3b465e';
           ctx.strokeStyle = '#1e2533';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.arc(cx - 18, cloudY, 15, 0, Math.PI * 2);
-          ctx.arc(cx, cloudY - 5, 19, 0, Math.PI * 2);
-          ctx.arc(cx + 18, cloudY, 15, 0, Math.PI * 2);
-          ctx.roundRect(cx - 28, cloudY - 4, 56, 18, 9);
+          ctx.arc(cx - 20, cloudY, 16, 0, Math.PI * 2);
+          ctx.arc(cx, cloudY - 5, 20, 0, Math.PI * 2);
+          ctx.arc(cx + 20, cloudY, 16, 0, Math.PI * 2);
+          ctx.roundRect(cx - 31, cloudY - 4, 62, 19, 9);
           ctx.fill();
           ctx.stroke();
         } else if (obs.kind === 'lamp') {
-          // Восточный фонарный столб с куполом и тёплым светом
+          // Крупный восточный фонарный столб с золотым куполом
           const lx = obs.x + obs.w * 0.5;
           const bottomY = obs.y + obs.h;
-          const topY = obs.y + 16;
+          const topY = obs.y + 32;
 
-          // Основание и резной столб
-          ctx.fillStyle = '#2d3748';
-          ctx.strokeStyle = '#141923';
-          ctx.lineWidth = 1.8;
-          ctx.fillRect(lx - 8, bottomY - 10, 16, 10);
-          ctx.strokeRect(lx - 8, bottomY - 10, 16, 10);
+          // Массивное ступенчатое основание
+          ctx.fillStyle = '#242d3d';
+          ctx.strokeStyle = '#10151f';
+          ctx.lineWidth = 2;
+          ctx.fillRect(lx - 14, bottomY - 12, 28, 12);
+          ctx.strokeRect(lx - 14, bottomY - 12, 28, 12);
+          ctx.fillRect(lx - 10, bottomY - 22, 20, 10);
+          ctx.strokeRect(lx - 10, bottomY - 22, 20, 10);
 
+          // Толстый резной столб
           ctx.fillStyle = '#3a475c';
-          ctx.fillRect(lx - 3.5, topY, 7, obs.h - 10);
-          ctx.strokeRect(lx - 3.5, topY, 7, obs.h - 10);
+          ctx.fillRect(lx - 5.5, topY, 11, obs.h - 22);
+          ctx.strokeRect(lx - 5.5, topY, 11, obs.h - 22);
 
-          // Декоративные кольца на столбе
-          ctx.fillStyle = '#d4a338';
-          ctx.fillRect(lx - 5.5, bottomY - 28, 11, 4);
-          ctx.fillRect(lx - 5.5, topY + 14, 11, 4);
+          // Золотые декоративные пояса по всей высоте
+          ctx.fillStyle = '#e09f1f';
+          for (let ry = bottomY - 42; ry > topY + 14; ry -= 32) {
+            ctx.fillRect(lx - 8, ry, 16, 5);
+          }
 
-          // Свечение фонаря
-          const glow = ctx.createRadialGradient(lx, topY - 4, 3, lx, topY - 4, 24);
-          glow.addColorStop(0, 'rgba(255, 224, 130, 0.55)');
+          // Тёплое свечение фонаря
+          const glow = ctx.createRadialGradient(lx, topY - 10, 4, lx, topY - 10, 38);
+          glow.addColorStop(0, 'rgba(255, 224, 130, 0.65)');
           glow.addColorStop(1, 'rgba(255, 224, 130, 0)');
           ctx.fillStyle = glow;
           ctx.beginPath();
-          ctx.arc(lx, topY - 4, 24, 0, Math.PI * 2);
+          ctx.arc(lx, topY - 10, 38, 0, Math.PI * 2);
           ctx.fill();
 
-          // Восточный фонарь с куполом
+          // Крупный восточный стеклянный плафон
           ctx.fillStyle = '#ffe082';
           ctx.strokeStyle = '#8c5a00';
-          ctx.lineWidth = 1.6;
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(lx - 7, topY);
-          ctx.lineTo(lx - 9, topY - 10);
-          ctx.lineTo(lx + 9, topY - 10);
-          ctx.lineTo(lx + 7, topY);
+          ctx.moveTo(lx - 11, topY);
+          ctx.lineTo(lx - 15, topY - 18);
+          ctx.lineTo(lx + 15, topY - 18);
+          ctx.lineTo(lx + 11, topY);
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
 
-          // Золотой купол и шпиль
+          // Решётка на плафоне
+          ctx.beginPath();
+          ctx.moveTo(lx, topY);
+          ctx.lineTo(lx, topY - 18);
+          ctx.stroke();
+
+          // Высокий золотой восточный купол со шпилем
           ctx.fillStyle = '#e09f1f';
           ctx.beginPath();
-          ctx.moveTo(lx - 11, topY - 10);
-          ctx.quadraticCurveTo(lx, topY - 22, lx + 11, topY - 10);
+          ctx.moveTo(lx - 18, topY - 18);
+          ctx.quadraticCurveTo(lx, topY - 36, lx + 18, topY - 18);
           ctx.closePath();
           ctx.fill();
           ctx.stroke();
 
           ctx.beginPath();
-          ctx.moveTo(lx, topY - 18);
-          ctx.lineTo(lx, topY - 25);
+          ctx.moveTo(lx, topY - 28);
+          ctx.lineTo(lx, topY - 39);
           ctx.stroke();
         } else if (obs.kind === 'palm') {
-          // Финиковая пальма с лёгким покачиванием кроны
+          // Высокая финиковая пальма с мощным стволом и пышной кроной
           const px = obs.x + obs.w * 0.5;
           const bottomY = obs.y + obs.h;
-          const crownY = obs.y + 14;
-          const sway = Math.sin(obs.swayPhase) * 3.5;
+          const crownY = obs.y + 26;
+          const sway = Math.sin(obs.swayPhase) * 4.5;
+          const topX = px + sway * 0.45;
 
-          // Ствол с насечками
+          // Утолщённый фактурный ствол
           ctx.strokeStyle = '#6b4423';
-          ctx.lineWidth = 8;
+          ctx.lineWidth = 13;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(px, bottomY);
-          ctx.quadraticCurveTo(px - 4, (bottomY + crownY) * 0.5, px + sway * 0.4, crownY + 2);
+          ctx.moveTo(px, bottomY - 2);
+          ctx.quadraticCurveTo(px - 6, (bottomY + crownY) * 0.5, topX, crownY + 4);
           ctx.stroke();
 
+          // Кольцевые насечки коры
           ctx.strokeStyle = '#4a2e16';
-          ctx.lineWidth = 1.5;
-          for (let y = bottomY - 10; y > crownY + 6; y -= 11) {
+          ctx.lineWidth = 2;
+          for (let y = bottomY - 12; y > crownY + 10; y -= 13) {
+            const t = (bottomY - y) / Math.max(1, bottomY - crownY);
+            const cxStem = px - Math.sin(t * Math.PI) * 3 + sway * 0.45 * t;
             ctx.beginPath();
-            ctx.moveTo(px - 4.5, y);
-            ctx.lineTo(px + 3.5, y - 2);
+            ctx.moveTo(cxStem - 6.5, y);
+            ctx.lineTo(cxStem + 6.5, y - 3);
             ctx.stroke();
           }
 
-          // Пальмовые ветви (крона)
-          const topX = px + sway * 0.4;
-          const frondAngles = [-2.55, -2.05, -1.57, -1.08, -0.58, 0.28, 2.86];
-          ctx.strokeStyle = '#2d6a4f';
-          ctx.lineWidth = 4.2;
-          for (const ang of frondAngles) {
-            const len = 21 + Math.cos(ang * 2) * 3;
-            const endX = topX + Math.cos(ang) * len + sway * 0.5;
-            const endY = crownY + Math.sin(ang) * len + 5;
+          // Крупные раскидистые пальмовые ветви
+          const frondAngles = [-2.65, -2.2, -1.8, -1.35, -0.9, -0.45, 0.25, 2.88];
+          for (let f = 0; f < frondAngles.length; f++) {
+            const ang = frondAngles[f];
+            const len = 32 + Math.cos(ang * 2) * 5;
+            const endX = topX + Math.cos(ang) * len + sway * 0.6;
+            const endY = crownY + Math.sin(ang) * len + 9;
+
+            ctx.strokeStyle = f % 2 === 0 ? '#2d6a4f' : '#40916c';
+            ctx.lineWidth = 6.2;
             ctx.beginPath();
             ctx.moveTo(topX, crownY);
             ctx.quadraticCurveTo(
               (topX + endX) * 0.5,
-              Math.min(crownY, endY) - 6,
+              Math.min(crownY, endY) - 10,
               endX,
               endY
             );
             ctx.stroke();
           }
 
-          // Гроздь фиников у основания кроны
+          // Крупные гроздья фиников под кроной
           ctx.fillStyle = '#9c4221';
           ctx.beginPath();
-          ctx.arc(topX - 3, crownY + 4, 3, 0, Math.PI * 2);
-          ctx.arc(topX + 2, crownY + 5, 3, 0, Math.PI * 2);
+          ctx.arc(topX - 5, crownY + 7, 4.5, 0, Math.PI * 2);
+          ctx.arc(topX + 4, crownY + 8, 4.5, 0, Math.PI * 2);
+          ctx.arc(topX, crownY + 11, 4, 0, Math.PI * 2);
           ctx.fill();
         } else if (obs.kind === 'carpet') {
           ctx.save();
