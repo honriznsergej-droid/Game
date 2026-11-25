@@ -543,10 +543,9 @@
     let midBuildings = [];
     let streetProps = [];
 
-    // Уиппет в красной кофточке с высоким воротником, бегающий по улице
     const whippetDog = {
       x: 260,
-      dir: 1, // 1 — вправо, -1 — влево
+      dir: 1,
       runSpeed: 64,
       runPhase: 0,
       happyPhase: 0,
@@ -785,35 +784,37 @@
 
       const typeRoll = Math.random();
       if (typeRoll < 0.42) {
-        const w = 44;
-        const h = Math.min(150, Math.max(68, playableH * (0.18 + Math.random() * 0.16)));
-        const fromTop = Math.random() < 0.5;
+        // Верхнее препятствие: грозовая туча с молнией
+        const w = 68;
+        const h = Math.min(132, Math.max(76, playableH * (0.2 + Math.random() * 0.14)));
         obstacles.push({
-          kind: 'chimney',
-          x: width + 40,
-          y: fromTop ? playableTop : playableBottom - h,
+          kind: 'storm_cloud',
+          x: width + 45,
+          y: playableTop,
           w,
           h,
-          fromTop,
-          smokeTimer: 0
+          boltPhase: Math.random() * Math.PI * 2
         });
       } else if (typeRoll < 0.76) {
-        const w = 30;
-        const h = Math.min(125, Math.max(62, playableH * (0.15 + Math.random() * 0.14)));
+        // Нижние препятствия: восточный фонарный столб или пальма
+        const isPalm = Math.random() < 0.52;
+        const w = isPalm ? 36 : 30;
+        const h = Math.min(132, Math.max(66, playableH * (0.16 + Math.random() * 0.14)));
         obstacles.push({
-          kind: 'post',
+          kind: isPalm ? 'palm' : 'lamp',
           x: width + 40,
           y: playableBottom - h,
           w,
-          h
+          h,
+          swayPhase: Math.random() * Math.PI * 2
         });
       } else {
         const kind = nextSkyFlyerKind();
-        const r = kind === 'taxi' ? 25 : 22;
-        const cy = playableTop + 36 + Math.random() * Math.max(60, playableH - 72);
+        const r = kind === 'taxi' ? 42 : 22;
+        const cy = playableTop + 44 + Math.random() * Math.max(60, playableH - 88);
         obstacles.push({
           kind,
-          x: width + 40,
+          x: width + 55,
           y: cy,
           baseY: cy,
           r,
@@ -885,6 +886,9 @@
       if (obs.kind === 'carpet') return 'Не поделил небо с летающим ковром над Дубаем!';
       if (obs.kind === 'taxi') return 'Подрезал дубайское аэротакси в час пик!';
       if (obs.kind === 'falcon') return 'Пересёк траекторию пустынного сокола!';
+      if (obs.kind === 'storm_cloud') return 'Попал под разряд грозовой тучи!';
+      if (obs.kind === 'palm') return 'Задел крону пальмы во время полёта!';
+      if (obs.kind === 'lamp') return 'Врезался в восточный фонарный столб!';
       return 'Столкновение с препятствием!';
     }
 
@@ -1043,30 +1047,55 @@
         if (obs.kind === 'carpet' || obs.kind === 'taxi' || obs.kind === 'falcon') {
           obs.phase += dt * (obs.kind === 'falcon' ? 4.4 : 3.2);
           obs.y = obs.baseY + Math.sin(obs.phase) * (obs.kind === 'carpet' ? 24 : 18);
-        } else if (obs.kind === 'chimney') {
-          obs.smokeTimer -= dt;
-          if (obs.smokeTimer <= 0) {
-            obs.smokeTimer = 0.22;
-            const smokeY = obs.fromTop ? obs.y + obs.h : obs.y;
-            particles.push({
-              x: obs.x + obs.w * 0.5,
-              y: smokeY,
-              vx: -worldSpeed * 0.25 + (Math.random() * 20 - 10),
-              vy: obs.fromTop ? 35 : -45,
-              life: 0.75,
-              maxLife: 0.75,
-              size: 6 + Math.random() * 5,
-              color: 'rgba(235, 240, 248, 0.55)'
-            });
-          }
+        } else if (obs.kind === 'storm_cloud') {
+          obs.boltPhase += dt * 7;
+        } else if (obs.kind === 'palm' || obs.kind === 'lamp') {
+          obs.swayPhase += dt * 3;
         }
 
         let hit = false;
         if (obs.kind === 'carpet' || obs.kind === 'taxi' || obs.kind === 'falcon') {
           const dx = player.x - obs.x;
           const dy = player.y - obs.y;
-          const sumR = obs.r * 0.88 + Math.min(player.radiusX, player.radiusY) * 0.74;
+          const sumR = obs.r * 0.85 + Math.min(player.radiusX, player.radiusY) * 0.74;
           hit = (dx * dx + dy * dy) < (sumR * sumR);
+        } else if (obs.kind === 'storm_cloud') {
+          const cloudH = Math.min(44, obs.h * 0.45);
+          const hitCloud = circleRectCollide(
+            player.x,
+            player.y,
+            Math.min(player.radiusX, player.radiusY) * 0.75,
+            obs.x + 4,
+            obs.y + 4,
+            obs.w - 8,
+            cloudH
+          );
+          const hitBolt = circleRectCollide(
+            player.x,
+            player.y,
+            Math.min(player.radiusX, player.radiusY) * 0.65,
+            obs.x + obs.w * 0.36,
+            obs.y + cloudH - 2,
+            obs.w * 0.28,
+            Math.max(16, obs.h - cloudH - 4)
+          );
+          hit = hitCloud || hitBolt;
+        } else if (obs.kind === 'palm') {
+          const hitTrunk = circleRectCollide(
+            player.x,
+            player.y,
+            Math.min(player.radiusX, player.radiusY) * 0.72,
+            obs.x + obs.w * 0.3,
+            obs.y + 18,
+            obs.w * 0.4,
+            obs.h - 20
+          );
+          const crownX = obs.x + obs.w * 0.5;
+          const crownY = obs.y + 14;
+          const dx = player.x - crownX;
+          const dy = player.y - crownY;
+          const crownR = 22 + Math.min(player.radiusX, player.radiusY) * 0.65;
+          hit = hitTrunk || (dx * dx + dy * dy) < (crownR * crownR);
         } else {
           hit = circleRectCollide(
             player.x,
@@ -1085,7 +1114,7 @@
           return;
         }
 
-        if (obs.x + (obs.w || obs.r * 2) < -80) {
+        if (obs.x + (obs.w || obs.r * 2.4) < -110) {
           obstacles.splice(i, 1);
         }
       }
@@ -1328,7 +1357,6 @@
       }
     }
 
-    // Бегущий по дороге уиппет в терракотово-красной флисовой кофте с высоким воротником
     function drawWhippetDog() {
       const groundY = height - groundHeight;
       const isGreeting = whippetDog.greeting;
@@ -1348,13 +1376,11 @@
       ctx.translate(whippetDog.x, groundY + bounce);
       ctx.scale(whippetDog.dir, 1);
 
-      // Тень под лапами
       ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
       ctx.beginPath();
       ctx.ellipse(0, 2 - bounce, 18, 4, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Тонкий изогнутый хвост уиппета
       ctx.save();
       ctx.translate(-15, -16);
       ctx.rotate(tailWag);
@@ -1367,20 +1393,16 @@
       ctx.stroke();
       ctx.restore();
 
-      // Дальние лапы (чуть темнее для объёма)
       ctx.strokeStyle = '#b8b4ae';
       ctx.lineWidth = 2.8;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      // Задняя дальняя
       ctx.moveTo(-11, -13);
       ctx.lineTo(-13 - legSwing * 0.8, -1);
-      // Передняя дальняя
       ctx.moveTo(9, -13);
       ctx.lineTo(10 + legSwing * 0.8, -1);
       ctx.stroke();
 
-      // Поджарый силуэт тела уиппета в терракотово-красной флисовой кофте
       ctx.fillStyle = '#9e2a1c';
       ctx.strokeStyle = '#6e190f';
       ctx.lineWidth = 1.4;
@@ -1393,21 +1415,17 @@
       ctx.fill();
       ctx.stroke();
 
-      // Текстурный шов рукава на кофте
       ctx.strokeStyle = '#7c1d12';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.arc(8, -15, 4.5, -0.4, 1.9);
       ctx.stroke();
 
-      // Ближние стройные лапы
       ctx.strokeStyle = '#e5e2dc';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      // Задняя ближняя
       ctx.moveTo(-10, -13);
       ctx.lineTo(-11 + legSwing, -1);
-      // Передняя ближняя (при приветствии радостно приподнимает лапку)
       if (isGreeting) {
         const pawLift = Math.sin(whippetDog.happyPhase) * 3;
         ctx.moveTo(9, -13);
@@ -1419,7 +1437,6 @@
       }
       ctx.stroke();
 
-      // Высокий воротник-стойка (как на обложке DOGUE)
       ctx.fillStyle = '#a83020';
       ctx.strokeStyle = '#731b10';
       ctx.lineWidth = 1.4;
@@ -1432,7 +1449,6 @@
       ctx.fill();
       ctx.stroke();
 
-      // Верхняя тонкая кайма воротника
       ctx.strokeStyle = '#c84b36';
       ctx.lineWidth = 1.6;
       ctx.beginPath();
@@ -1440,14 +1456,12 @@
       ctx.lineTo(19, -30);
       ctx.stroke();
 
-      // Голова и длинная изящная морда уиппета (бело-серебристая)
       ctx.save();
       ctx.translate(14, -33);
       if (isGreeting) {
-        ctx.rotate(-0.22); // Слегка задирает голову вверх, глядя на обезьянку
+        ctx.rotate(-0.22);
       }
 
-      // Шея, выглядывающая из воротника
       ctx.fillStyle = '#dcdad5';
       ctx.beginPath();
       ctx.moveTo(-5, 4);
@@ -1457,22 +1471,20 @@
       ctx.closePath();
       ctx.fill();
 
-      // Череп и длинная узкая морда
       ctx.fillStyle = '#eceae6';
       ctx.strokeStyle = '#9e9b95';
       ctx.lineWidth = 1.1;
       ctx.beginPath();
       ctx.moveTo(-4, -5);
       ctx.quadraticCurveTo(2, -8, 8, -5);
-      ctx.lineTo(20, -2.5); // длинная переносица
-      ctx.quadraticCurveTo(22, -1, 20, 1.5); // кончик морды
+      ctx.lineTo(20, -2.5);
+      ctx.quadraticCurveTo(22, -1, 20, 1.5);
       ctx.lineTo(7, 2.5);
       ctx.quadraticCurveTo(1, 3, -4, 0);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Тёмная линия губ
       ctx.strokeStyle = '#2b2927';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
@@ -1480,13 +1492,11 @@
       ctx.lineTo(19.5, 0.8);
       ctx.stroke();
 
-      // Чёрный носик на самом кончике
       ctx.fillStyle = '#1f1e1d';
       ctx.beginPath();
       ctx.arc(20.6, -1.2, 1.8, 0, Math.PI * 2);
       ctx.fill();
 
-      // Тёплый карий глаз с бликом
       ctx.fillStyle = '#5c3a21';
       ctx.beginPath();
       ctx.arc(7.5, -3.2, 1.9, 0, Math.PI * 2);
@@ -1496,7 +1506,6 @@
       ctx.arc(8, -3.7, 0.65, 0, Math.PI * 2);
       ctx.fill();
 
-      // Фирменное заложенное назад серо-дымчатое ушко уиппета
       ctx.fillStyle = '#8b8a88';
       ctx.strokeStyle = '#5e5d5b';
       ctx.lineWidth = 1;
@@ -1514,28 +1523,159 @@
 
     function drawObstacles() {
       for (const obs of obstacles) {
-        if (obs.kind === 'chimney') {
-          ctx.fillStyle = '#8d3b2c';
-          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-          ctx.strokeStyle = '#4a1d15';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+        if (obs.kind === 'storm_cloud') {
+          // Грозовая туча сверху с зигзагом молнии
+          const cx = obs.x + obs.w * 0.5;
+          const cloudY = obs.y + 20;
+          const flash = Math.sin(obs.boltPhase * 2.3) > 0.35;
 
-          const lipH = 10;
-          const lipY = obs.fromTop ? obs.y + obs.h - lipH : obs.y;
-          ctx.fillStyle = '#a84736';
-          ctx.fillRect(obs.x - 4, lipY, obs.w + 8, lipH);
-          ctx.strokeRect(obs.x - 4, lipY, obs.w + 8, lipH);
-        } else if (obs.kind === 'post') {
-          ctx.fillStyle = '#3b4252';
-          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-          ctx.strokeStyle = '#191d24';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+          // Зигзаг молнии вниз от тучи
+          const boltTop = cloudY + 12;
+          const boltBot = Math.max(boltTop + 14, obs.y + obs.h - 4);
+          const midY = (boltTop + boltBot) * 0.52;
 
-          ctx.fillStyle = '#f77f00';
-          ctx.fillRect(obs.x - 3, obs.y, obs.w + 6, 12);
-          ctx.strokeRect(obs.x - 3, obs.y, obs.w + 6, 12);
+          if (flash) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(255, 224, 102, 0.25)';
+            ctx.beginPath();
+            ctx.arc(cx, midY, 24, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+
+          ctx.fillStyle = flash ? '#fff3b0' : '#ffd166';
+          ctx.strokeStyle = '#b56500';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(cx + 5, boltTop);
+          ctx.lineTo(cx - 7, midY + 1);
+          ctx.lineTo(cx + 1, midY + 2);
+          ctx.lineTo(cx - 6, boltBot);
+          ctx.lineTo(cx + 8, midY - 2);
+          ctx.lineTo(cx + 1, midY - 3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Тело тёмно-синей грозовой тучи
+          ctx.fillStyle = '#3b465e';
+          ctx.strokeStyle = '#1e2533';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(cx - 18, cloudY, 15, 0, Math.PI * 2);
+          ctx.arc(cx, cloudY - 5, 19, 0, Math.PI * 2);
+          ctx.arc(cx + 18, cloudY, 15, 0, Math.PI * 2);
+          ctx.roundRect(cx - 28, cloudY - 4, 56, 18, 9);
+          ctx.fill();
+          ctx.stroke();
+        } else if (obs.kind === 'lamp') {
+          // Восточный фонарный столб с куполом и тёплым светом
+          const lx = obs.x + obs.w * 0.5;
+          const bottomY = obs.y + obs.h;
+          const topY = obs.y + 16;
+
+          // Основание и резной столб
+          ctx.fillStyle = '#2d3748';
+          ctx.strokeStyle = '#141923';
+          ctx.lineWidth = 1.8;
+          ctx.fillRect(lx - 8, bottomY - 10, 16, 10);
+          ctx.strokeRect(lx - 8, bottomY - 10, 16, 10);
+
+          ctx.fillStyle = '#3a475c';
+          ctx.fillRect(lx - 3.5, topY, 7, obs.h - 10);
+          ctx.strokeRect(lx - 3.5, topY, 7, obs.h - 10);
+
+          // Декоративные кольца на столбе
+          ctx.fillStyle = '#d4a338';
+          ctx.fillRect(lx - 5.5, bottomY - 28, 11, 4);
+          ctx.fillRect(lx - 5.5, topY + 14, 11, 4);
+
+          // Свечение фонаря
+          const glow = ctx.createRadialGradient(lx, topY - 4, 3, lx, topY - 4, 24);
+          glow.addColorStop(0, 'rgba(255, 224, 130, 0.55)');
+          glow.addColorStop(1, 'rgba(255, 224, 130, 0)');
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(lx, topY - 4, 24, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Восточный фонарь с куполом
+          ctx.fillStyle = '#ffe082';
+          ctx.strokeStyle = '#8c5a00';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.moveTo(lx - 7, topY);
+          ctx.lineTo(lx - 9, topY - 10);
+          ctx.lineTo(lx + 9, topY - 10);
+          ctx.lineTo(lx + 7, topY);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Золотой купол и шпиль
+          ctx.fillStyle = '#e09f1f';
+          ctx.beginPath();
+          ctx.moveTo(lx - 11, topY - 10);
+          ctx.quadraticCurveTo(lx, topY - 22, lx + 11, topY - 10);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(lx, topY - 18);
+          ctx.lineTo(lx, topY - 25);
+          ctx.stroke();
+        } else if (obs.kind === 'palm') {
+          // Финиковая пальма с лёгким покачиванием кроны
+          const px = obs.x + obs.w * 0.5;
+          const bottomY = obs.y + obs.h;
+          const crownY = obs.y + 14;
+          const sway = Math.sin(obs.swayPhase) * 3.5;
+
+          // Ствол с насечками
+          ctx.strokeStyle = '#6b4423';
+          ctx.lineWidth = 8;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(px, bottomY);
+          ctx.quadraticCurveTo(px - 4, (bottomY + crownY) * 0.5, px + sway * 0.4, crownY + 2);
+          ctx.stroke();
+
+          ctx.strokeStyle = '#4a2e16';
+          ctx.lineWidth = 1.5;
+          for (let y = bottomY - 10; y > crownY + 6; y -= 11) {
+            ctx.beginPath();
+            ctx.moveTo(px - 4.5, y);
+            ctx.lineTo(px + 3.5, y - 2);
+            ctx.stroke();
+          }
+
+          // Пальмовые ветви (крона)
+          const topX = px + sway * 0.4;
+          const frondAngles = [-2.55, -2.05, -1.57, -1.08, -0.58, 0.28, 2.86];
+          ctx.strokeStyle = '#2d6a4f';
+          ctx.lineWidth = 4.2;
+          for (const ang of frondAngles) {
+            const len = 21 + Math.cos(ang * 2) * 3;
+            const endX = topX + Math.cos(ang) * len + sway * 0.5;
+            const endY = crownY + Math.sin(ang) * len + 5;
+            ctx.beginPath();
+            ctx.moveTo(topX, crownY);
+            ctx.quadraticCurveTo(
+              (topX + endX) * 0.5,
+              Math.min(crownY, endY) - 6,
+              endX,
+              endY
+            );
+            ctx.stroke();
+          }
+
+          // Гроздь фиников у основания кроны
+          ctx.fillStyle = '#9c4221';
+          ctx.beginPath();
+          ctx.arc(topX - 3, crownY + 4, 3, 0, Math.PI * 2);
+          ctx.arc(topX + 2, crownY + 5, 3, 0, Math.PI * 2);
+          ctx.fill();
         } else if (obs.kind === 'carpet') {
           ctx.save();
           ctx.translate(obs.x, obs.y);
@@ -1560,34 +1700,78 @@
         } else if (obs.kind === 'taxi') {
           ctx.save();
           ctx.translate(obs.x, obs.y);
+          ctx.scale(2.15, 2.15);
+
+          ctx.strokeStyle = '#495057';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(-18, 12);
+          ctx.lineTo(18, 12);
+          ctx.moveTo(-11, 8);
+          ctx.lineTo(-11, 12);
+          ctx.moveTo(11, 8);
+          ctx.lineTo(11, 12);
+          ctx.stroke();
+
+          ctx.fillStyle = '#2b9348';
+          ctx.strokeStyle = '#212529';
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.moveTo(-22, 0);
+          ctx.lineTo(-32, -8);
+          ctx.lineTo(-32, 4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
 
           ctx.fillStyle = '#f8f9fa';
           ctx.strokeStyle = '#212529';
           ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.roundRect(-24, -10, 48, 20, 9);
+          ctx.roundRect(-24, -10, 49, 20, 10);
           ctx.fill();
           ctx.stroke();
 
           ctx.fillStyle = '#2b9348';
           ctx.beginPath();
-          ctx.roundRect(-16, -6, 32, 8, 4);
+          ctx.roundRect(-20, -1, 41, 5, 2.5);
           ctx.fill();
+
+          ctx.fillStyle = '#2b4c66';
+          ctx.beginPath();
+          ctx.roundRect(-14, -7, 13, 5.5, 2);
+          ctx.roundRect(1, -7, 15, 5.5, 2.5);
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(3, -6);
+          ctx.lineTo(8, -2);
+          ctx.stroke();
 
           const blink = Math.sin(elapsed * 14) > 0;
           ctx.fillStyle = blink ? '#ffbe0b' : '#3a86ff';
           ctx.beginPath();
-          ctx.arc(-14, 5, 3, 0, Math.PI * 2);
-          ctx.arc(14, 5, 3, 0, Math.PI * 2);
+          ctx.arc(-16, 6.5, 2.8, 0, Math.PI * 2);
+          ctx.arc(17, 6.5, 2.8, 0, Math.PI * 2);
           ctx.fill();
 
-          const span = Math.abs(Math.cos(elapsed * 26)) * 22 + 8;
-          ctx.strokeStyle = '#ffd166';
-          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = '#212529';
+          ctx.lineWidth = 2;
           ctx.beginPath();
-          ctx.moveTo(-span, -14);
-          ctx.lineTo(span, -14);
+          ctx.moveTo(0, -10);
+          ctx.lineTo(0, -15);
           ctx.stroke();
+
+          const span = Math.abs(Math.cos(elapsed * 26)) * 28 + 10;
+          ctx.strokeStyle = '#ffd166';
+          ctx.lineWidth = 2.8;
+          ctx.beginPath();
+          ctx.moveTo(-span, -15.5);
+          ctx.lineTo(span, -15.5);
+          ctx.stroke();
+
           ctx.restore();
         } else if (obs.kind === 'falcon') {
           ctx.save();
